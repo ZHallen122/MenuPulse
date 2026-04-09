@@ -3,6 +3,8 @@ import SwiftUI
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
+    private var popover: NSPopover?
+    let monitor = ProcessMonitor()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -10,24 +12,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let button = statusItem?.button {
             button.image = NSImage(systemSymbolName: "stethoscope", accessibilityDescription: "Menu Bar Diagnostic")
             button.imagePosition = .imageLeft
+            button.action = #selector(togglePopover(_:))
+            button.target = self
         }
 
-        buildMenu()
+        setupPopover()
+        monitor.startMonitoring()
     }
 
-    private func buildMenu() {
-        let menu = NSMenu()
-
-        menu.addItem(NSMenuItem(title: "Menu Bar Diagnostic", action: nil, keyEquivalent: ""))
-        menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "About", action: #selector(showAbout), keyEquivalent: ""))
-        menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
-
-        statusItem?.menu = menu
+    func applicationWillTerminate(_ notification: Notification) {
+        monitor.stopMonitoring()
     }
 
-    @objc private func showAbout() {
-        NSApp.orderFrontStandardAboutPanel(nil)
+    private func setupPopover() {
+        let vc = NSHostingController(rootView: StatusMenuView(monitor: monitor))
+        let pop = NSPopover()
+        pop.contentViewController = vc
+        pop.contentSize = NSSize(width: 320, height: 400)
+        pop.behavior = .transient
+        self.popover = pop
+    }
+
+    @objc private func togglePopover(_ sender: AnyObject?) {
+        guard let button = statusItem?.button, let popover else { return }
+        if popover.isShown {
+            popover.performClose(sender)
+        } else {
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            popover.contentViewController?.view.window?.makeKey()
+        }
     }
 }

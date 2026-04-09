@@ -10,6 +10,8 @@
 		AA0000000000000000000011 /* MenuBarDiagnosticApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000000D /* MenuBarDiagnosticApp.swift */; };
 		AA0000000000000000000012 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000000E /* AppDelegate.swift */; };
 		AA0000000000000000000013 /* StatusMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000000F /* StatusMenuView.swift */; };
+		AA0000000000000000000022 /* MenuBarProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000020 /* MenuBarProcess.swift */; };
+		AA0000000000000000000023 /* ProcessMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000021 /* ProcessMonitor.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -18,6 +20,8 @@
 		AA000000000000000000000E /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		AA000000000000000000000F /* StatusMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenuView.swift; sourceTree = "<group>"; };
 		AA0000000000000000000010 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		AA0000000000000000000020 /* MenuBarProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarProcess.swift; sourceTree = "<group>"; };
+		AA0000000000000000000021 /* ProcessMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessMonitor.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -53,6 +57,8 @@
 				AA000000000000000000000D /* MenuBarDiagnosticApp.swift */,
 				AA000000000000000000000E /* AppDelegate.swift */,
 				AA000000000000000000000F /* StatusMenuView.swift */,
+				AA0000000000000000000020 /* MenuBarProcess.swift */,
+				AA0000000000000000000021 /* ProcessMonitor.swift */,
 				AA0000000000000000000010 /* Info.plist */,
 			);
 			path = MenuBarDiagnostic;
@@ -129,6 +135,8 @@
 				AA0000000000000000000011 /* MenuBarDiagnosticApp.swift in Sources */,
 				AA0000000000000000000012 /* AppDelegate.swift in Sources */,
 				AA0000000000000000000013 /* StatusMenuView.swift in Sources */,
+				AA0000000000000000000022 /* MenuBarProcess.swift in Sources */,
+				AA0000000000000000000023 /* ProcessMonitor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
