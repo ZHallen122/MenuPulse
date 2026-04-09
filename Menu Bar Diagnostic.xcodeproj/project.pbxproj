@@ -14,6 +14,8 @@
 		AA0000000000000000000023 /* ProcessMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000021 /* ProcessMonitor.swift */; };
 		AA0000000000000000000031 /* HUDWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000030 /* HUDWindow.swift */; };
 		AA0000000000000000000033 /* HUDView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000032 /* HUDView.swift */; };
+		AA0000000000000000000041 /* PreferencesManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000040 /* PreferencesManager.swift */; };
+		AA0000000000000000000043 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000042 /* SettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -26,6 +28,8 @@
 		AA0000000000000000000021 /* ProcessMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessMonitor.swift; sourceTree = "<group>"; };
 		AA0000000000000000000030 /* HUDWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDWindow.swift; sourceTree = "<group>"; };
 		AA0000000000000000000032 /* HUDView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDView.swift; sourceTree = "<group>"; };
+		AA0000000000000000000040 /* PreferencesManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesManager.swift; sourceTree = "<group>"; };
+		AA0000000000000000000042 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -65,6 +69,8 @@
 				AA0000000000000000000021 /* ProcessMonitor.swift */,
 				AA0000000000000000000030 /* HUDWindow.swift */,
 				AA0000000000000000000032 /* HUDView.swift */,
+				AA0000000000000000000040 /* PreferencesManager.swift */,
+				AA0000000000000000000042 /* SettingsView.swift */,
 				AA0000000000000000000010 /* Info.plist */,
 			);
 			path = MenuBarDiagnostic;
@@ -145,6 +151,8 @@
 				AA0000000000000000000023 /* ProcessMonitor.swift in Sources */,
 				AA0000000000000000000031 /* HUDWindow.swift in Sources */,
 				AA0000000000000000000033 /* HUDView.swift in Sources */,
+				AA0000000000000000000041 /* PreferencesManager.swift in Sources */,
+				AA0000000000000000000043 /* SettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

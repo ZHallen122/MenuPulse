@@ -3,6 +3,8 @@ import AppKit
 
 struct StatusMenuView: View {
     @ObservedObject var monitor: ProcessMonitor
+    @ObservedObject var prefs: PreferencesManager
+    @State private var showSettings = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -13,6 +15,9 @@ struct StatusMenuView: View {
             footerBar
         }
         .frame(width: 320)
+        .sheet(isPresented: $showSettings) {
+            SettingsView(prefs: prefs)
+        }
     }
 
     // MARK: - Sub-views
@@ -55,6 +60,11 @@ struct StatusMenuView: View {
     private var footerBar: some View {
         HStack {
             Button("About") { NSApp.orderFrontStandardAboutPanel(nil) }
+                .buttonStyle(.plain)
+                .foregroundColor(.secondary)
+                .font(.caption)
+            Spacer()
+            Button("Settings") { showSettings = true }
                 .buttonStyle(.plain)
                 .foregroundColor(.secondary)
                 .font(.caption)
@@ -171,5 +181,6 @@ private struct ProcessRow: View {
 }
 
 #Preview {
-    StatusMenuView(monitor: ProcessMonitor())
+    let prefs = PreferencesManager()
+    return StatusMenuView(monitor: ProcessMonitor(prefs: prefs), prefs: prefs)
 }

@@ -1,11 +1,15 @@
 import AppKit
 import SwiftUI
+import Combine
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
     private var hudWindow: HUDWindow?
-    let monitor = ProcessMonitor()
+    private var cancellables = Set<AnyCancellable>()
+
+    let prefs = PreferencesManager()
+    lazy var monitor: ProcessMonitor = ProcessMonitor(prefs: prefs)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -20,6 +24,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         setupPopover()
         monitor.startMonitoring()
+
+        // Update badge with process count after each sample
+        monitor.$processes
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] processes in
+                self?.statusItem?.button?.title = processes.isEmpty ? "" : "\(processes.count)"
+            }
+            .store(in: &cancellables)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -27,7 +39,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupPopover() {
-        let vc = NSHostingController(rootView: StatusMenuView(monitor: monitor))
+        let vc = NSHostingController(rootView: StatusMenuView(monitor: monitor, prefs: prefs))
         let pop = NSPopover()
         pop.contentViewController = vc
         pop.contentSize = NSSize(width: 320, height: 400)
@@ -62,7 +74,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 hud.makeKeyAndOrderFront(nil)
             }
         } else {
-            let hud = HUDWindow(monitor: monitor)
+            let hud = HUDWindow(monitor: monitor, prefs: prefs)
             hud.center()
             hud.makeKeyAndOrderFront(nil)
             hudWindow = hud

@@ -5,10 +5,16 @@ import AppKit
 
 struct HUDView: View {
     @ObservedObject var monitor: ProcessMonitor
+    @ObservedObject var prefs: PreferencesManager
 
     var body: some View {
         VStack(spacing: 0) {
-            ThermalHeaderView(thermalState: currentThermalState)
+            ThermalHeaderView(
+                thermalState: currentThermalState,
+                systemCPUFraction: monitor.systemCPUFraction,
+                systemRAMUsedBytes: monitor.systemRAMUsedBytes,
+                systemRAMTotalBytes: monitor.systemRAMTotalBytes
+            )
             Divider().opacity(0.4)
             processListView
         }
@@ -30,7 +36,11 @@ struct HUDView: View {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(monitor.processes) { process in
-                        HUDProcessRow(process: process)
+                        HUDProcessRow(
+                            process: process,
+                            cpuAlertThreshold: prefs.cpuAlertThreshold,
+                            ramAlertThresholdMB: prefs.ramAlertThresholdMB
+                        )
                         Divider().opacity(0.25)
                     }
                 }
@@ -43,6 +53,9 @@ struct HUDView: View {
 
 struct ThermalHeaderView: View {
     let thermalState: ProcessInfo.ThermalState
+    let systemCPUFraction: Double
+    let systemRAMUsedBytes: UInt64
+    let systemRAMTotalBytes: UInt64
 
     var body: some View {
         ZStack {
@@ -51,31 +64,66 @@ struct ThermalHeaderView: View {
                 startPoint: .leading,
                 endPoint: .trailing
             )
-            .frame(height: 58)
 
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Menu Bar Diagnostic")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.white)
-                    Label(thermalLabel, systemImage: thermalIcon)
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.85))
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Menu Bar Diagnostic")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.white)
+                        Label(thermalLabel, systemImage: thermalIcon)
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.85))
+                    }
+                    Spacer()
+                    // Thermal heatmap block
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(thermalColor)
+                            .shadow(color: thermalColor.opacity(0.6), radius: 8)
+                        Text(thermalLabel)
+                            .font(.caption2.bold())
+                            .foregroundColor(.white)
+                    }
+                    .frame(width: 62, height: 28)
                 }
-                Spacer()
-                // Thermal heatmap block
-                ZStack {
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(thermalColor)
-                        .shadow(color: thermalColor.opacity(0.6), radius: 8)
-                    Text(thermalLabel)
-                        .font(.caption2.bold())
-                        .foregroundColor(.white)
-                }
-                .frame(width: 62, height: 28)
+                SystemSummaryRow(
+                    cpuFraction: systemCPUFraction,
+                    ramUsedBytes: systemRAMUsedBytes,
+                    ramTotalBytes: systemRAMTotalBytes
+                )
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
+        }
+    }
+
+    // MARK: - System Summary Row
+
+    struct SystemSummaryRow: View {
+        let cpuFraction: Double
+        let ramUsedBytes: UInt64
+        let ramTotalBytes: UInt64
+
+        var body: some View {
+            HStack {
+                Text(String(format: "CPU: %.1f%%", cpuFraction * 100))
+                    .font(.caption.monospacedDigit())
+                    .foregroundColor(.white.opacity(0.9))
+                Spacer()
+                Text(ramString)
+                    .font(.caption.monospacedDigit())
+                    .foregroundColor(.white.opacity(0.9))
+            }
+        }
+
+        private var ramString: String {
+            let usedGB = Double(ramUsedBytes) / 1_073_741_824
+            let totalGB = Double(ramTotalBytes) / 1_073_741_824
+            if totalGB > 0 {
+                return String(format: "RAM: %.1f / %.0f GB", usedGB, totalGB)
+            }
+            return String(format: "RAM: %.1f GB", usedGB)
         }
     }
 
@@ -114,9 +162,12 @@ struct ThermalHeaderView: View {
 
 struct HUDProcessRow: View {
     let process: MenuBarProcess
+    var cpuAlertThreshold: Double = 0.05
+    var ramAlertThresholdMB: Double = 200.0
 
     private var isHogging: Bool {
-        process.cpuFraction > 0.05 || process.residentMemoryBytes > 200 * 1024 * 1024
+        process.cpuFraction > cpuAlertThreshold ||
+        process.residentMemoryBytes > UInt64(ramAlertThresholdMB * 1024 * 1024)
     }
 
     var body: some View {

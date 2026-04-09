@@ -3,7 +3,7 @@ import SwiftUI
 
 final class HUDWindow: NSPanel {
 
-    init(monitor: ProcessMonitor) {
+    init(monitor: ProcessMonitor, prefs: PreferencesManager) {
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: 360, height: 500),
             styleMask: [.nonactivatingPanel, .titled, .closable, .fullSizeContentView],
@@ -27,7 +27,7 @@ final class HUDWindow: NSPanel {
         effect.layer?.cornerRadius = 12
         effect.layer?.masksToBounds = true
 
-        let hosting = NSHostingView(rootView: HUDView(monitor: monitor))
+        let hosting = NSHostingView(rootView: HUDView(monitor: monitor, prefs: prefs))
         hosting.translatesAutoresizingMaskIntoConstraints = false
         effect.addSubview(hosting)
         NSLayoutConstraint.activate([
