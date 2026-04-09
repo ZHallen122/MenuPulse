@@ -12,6 +12,8 @@
 		AA0000000000000000000013 /* StatusMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000000F /* StatusMenuView.swift */; };
 		AA0000000000000000000022 /* MenuBarProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000020 /* MenuBarProcess.swift */; };
 		AA0000000000000000000023 /* ProcessMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000021 /* ProcessMonitor.swift */; };
+		AA0000000000000000000031 /* HUDWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000030 /* HUDWindow.swift */; };
+		AA0000000000000000000033 /* HUDView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000032 /* HUDView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -22,6 +24,8 @@
 		AA0000000000000000000010 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AA0000000000000000000020 /* MenuBarProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarProcess.swift; sourceTree = "<group>"; };
 		AA0000000000000000000021 /* ProcessMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessMonitor.swift; sourceTree = "<group>"; };
+		AA0000000000000000000030 /* HUDWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDWindow.swift; sourceTree = "<group>"; };
+		AA0000000000000000000032 /* HUDView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -59,6 +63,8 @@
 				AA000000000000000000000F /* StatusMenuView.swift */,
 				AA0000000000000000000020 /* MenuBarProcess.swift */,
 				AA0000000000000000000021 /* ProcessMonitor.swift */,
+				AA0000000000000000000030 /* HUDWindow.swift */,
+				AA0000000000000000000032 /* HUDView.swift */,
 				AA0000000000000000000010 /* Info.plist */,
 			);
 			path = MenuBarDiagnostic;
@@ -137,6 +143,8 @@
 				AA0000000000000000000013 /* StatusMenuView.swift in Sources */,
 				AA0000000000000000000022 /* MenuBarProcess.swift in Sources */,
 				AA0000000000000000000023 /* ProcessMonitor.swift in Sources */,
+				AA0000000000000000000031 /* HUDWindow.swift in Sources */,
+				AA0000000000000000000033 /* HUDView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

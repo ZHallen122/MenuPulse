@@ -7,6 +7,7 @@ struct MenuBarProcess: Identifiable {
     let bundleIdentifier: String?
     let icon: NSImage?
     let cpuFraction: Double
+    let cpuHistory: [Double]      // rolling buffer of last 20 CPU fraction samples
     let residentMemoryBytes: UInt64
     let thermalState: ProcessInfo.ThermalState
 }

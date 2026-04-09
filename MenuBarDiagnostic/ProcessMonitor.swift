@@ -7,6 +7,8 @@ class ProcessMonitor: ObservableObject {
     private var timer: Timer?
     // pid -> (accumulated CPU nanoseconds, wall-clock nanoseconds)
     private var previousSamples: [pid_t: (cpuNanos: UInt64, wallNanos: UInt64)] = [:]
+    // pid -> rolling CPU history (last 20 samples)
+    private var cpuHistories: [pid_t: [Double]] = [:]
 
     func startMonitoring() {
         sample()
@@ -50,12 +52,19 @@ class ProcessMonitor: ObservableObject {
 
             previousSamples[pid] = (cpuNanos: cpuNow, wallNanos: wallNow)
 
+            // Maintain rolling CPU history (max 20 samples)
+            var history = cpuHistories[pid] ?? []
+            history.append(cpuFraction)
+            if history.count > 20 { history.removeFirst(history.count - 20) }
+            cpuHistories[pid] = history
+
             newProcesses.append(MenuBarProcess(
                 pid: pid,
                 name: app.localizedName ?? "Unknown",
                 bundleIdentifier: app.bundleIdentifier,
                 icon: app.icon,
                 cpuFraction: cpuFraction,
+                cpuHistory: history,
                 residentMemoryBytes: info.pti_resident_size,
                 thermalState: thermalState
             ))
@@ -64,6 +73,7 @@ class ProcessMonitor: ObservableObject {
         // Remove stale samples for processes that are no longer running
         let livePIDs = Set(newProcesses.map { $0.pid })
         previousSamples = previousSamples.filter { livePIDs.contains($0.key) }
+        cpuHistories = cpuHistories.filter { livePIDs.contains($0.key) }
 
         let sorted = newProcesses.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         DispatchQueue.main.async { self.processes = sorted }
