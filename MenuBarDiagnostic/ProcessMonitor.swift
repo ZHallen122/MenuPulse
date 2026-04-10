@@ -32,6 +32,8 @@ class ProcessMonitor: ObservableObject {
 
     private let prefs: PreferencesManager
     private var timer: Timer?
+    private let dataStore = DataStore()
+    private var lastPersistTime: Date = .distantPast
 
     /// Maps each PID to its last-observed accumulated CPU nanoseconds and the
     /// wall-clock nanoseconds (`DispatchTime.now().uptimeNanoseconds`) at
@@ -124,8 +126,9 @@ class ProcessMonitor: ObservableObject {
             // Read physical memory footprint via proc_pid_rusage (more accurate than
             // pti_resident_size; matches Activity Monitor's "Memory" column).
             var rusageInfo = rusage_info_v4()
-            let rusageRet = withUnsafeMutablePointer(to: &rusageInfo) { ptr in
-                proc_pid_rusage(pid, RUSAGE_INFO_V4, UnsafeMutableRawPointer(ptr))
+            let rusageRet = withUnsafeMutablePointer(to: &rusageInfo) { ptr -> Int32 in
+                var voidPtr: rusage_info_t? = UnsafeMutableRawPointer(ptr)
+                return proc_pid_rusage(pid, RUSAGE_INFO_V4, &voidPtr)
             }
             let memFootprint: UInt64 = (rusageRet == 0) ? rusageInfo.ri_phys_footprint : 0
 
@@ -148,6 +151,13 @@ class ProcessMonitor: ObservableObject {
         cpuHistories = cpuHistories.filter { livePIDs.contains($0.key) }
 
         let sorted = newProcesses.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+
+        if Date().timeIntervalSince(lastPersistTime) >= 30 {
+            dataStore.persistSamples(sorted)
+            dataStore.purgeOldSamples()
+            dataStore.recomputeBaselines()
+            lastPersistTime = Date()
+        }
 
         let cpuFrac = sampleSystemCPU()
         let (ramUsed, ramTotal, pressure) = sampleSystemRAM()

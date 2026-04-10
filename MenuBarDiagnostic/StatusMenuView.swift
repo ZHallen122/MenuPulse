@@ -10,6 +10,7 @@ struct StatusMenuView: View {
         VStack(alignment: .leading, spacing: 0) {
             headerBar
             Divider()
+            learningBanner
             processListOrEmpty
             Divider()
             footerBar
@@ -21,6 +22,29 @@ struct StatusMenuView: View {
     }
 
     // MARK: - Sub-views
+
+    private var learningBanner: some View {
+        let defaults = UserDefaults.standard
+        let firstLaunch: Date = {
+            if let d = defaults.object(forKey: "firstLaunchDate") as? Date { return d }
+            let now = Date()
+            defaults.set(now, forKey: "firstLaunchDate")
+            return now
+        }()
+        let elapsed = Date().timeIntervalSince(firstLaunch)
+        let learningPeriod: TimeInterval = 3 * 86400
+        guard elapsed < learningPeriod else { return AnyView(EmptyView()) }
+        let daysRemaining = max(1, Int(ceil((learningPeriod - elapsed) / 86400)))
+        return AnyView(
+            Text("Bouncer is learning… smart alerts start in \(daysRemaining) day\(daysRemaining == 1 ? "" : "s")")
+                .font(.caption)
+                .foregroundColor(.black)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.yellow.opacity(0.85))
+        )
+    }
 
     private var headerBar: some View {
         HStack {
