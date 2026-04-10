@@ -53,6 +53,16 @@ final class DataStore {
         return result
     }
 
+    /// Returns raw memory samples for `bundleID` recorded on or after `since`,
+    /// ordered ascending by timestamp.
+    func recentSamples(for bundleID: String, since: Date) -> [(memoryMB: Double, timestamp: Date)] {
+        var result: [(memoryMB: Double, timestamp: Date)] = []
+        queue.sync {
+            result = queryRecentSamples(for: bundleID, since: since)
+        }
+        return result
+    }
+
     // MARK: - Private helpers
 
     private func openDatabase() {
@@ -180,6 +190,24 @@ final class DataStore {
             sqlite3_step(uStmt)
             sqlite3_reset(uStmt)
         }
+    }
+
+    private func queryRecentSamples(for bundleID: String, since: Date) -> [(memoryMB: Double, timestamp: Date)] {
+        guard let db = db else { return [] }
+        let cutoff = Int64(since.timeIntervalSince1970)
+        let sql = "SELECT memory_mb, sampled_at FROM memory_samples WHERE bundle_id = ? AND sampled_at >= ? ORDER BY sampled_at ASC;"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil)
+        sqlite3_bind_int64(stmt, 2, cutoff)
+        var rows: [(memoryMB: Double, timestamp: Date)] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let memMB = sqlite3_column_double(stmt, 0)
+            let ts = Date(timeIntervalSince1970: Double(sqlite3_column_int64(stmt, 1)))
+            rows.append((memoryMB: memMB, timestamp: ts))
+        }
+        return rows
     }
 
     private func queryBaseline(for bundleID: String) -> (avgMB: Double, p90MB: Double)? {

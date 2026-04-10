@@ -28,6 +28,15 @@ enum Sensitivity: String, CaseIterable {
         case .aggressive:   return 0.5
         }
     }
+
+    /// Multiplier applied to the p90 baseline to determine anomaly threshold.
+    var anomalyMultiplier: Double {
+        switch self {
+        case .conservative: return 4.0
+        case .default_:     return 2.5
+        case .aggressive:   return 1.5
+        }
+    }
 }
 
 class PreferencesManager: ObservableObject {

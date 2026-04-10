@@ -32,8 +32,11 @@ class ProcessMonitor: ObservableObject {
 
     private let prefs: PreferencesManager
     private var timer: Timer?
-    private let dataStore = DataStore()
+    let dataStore = DataStore()
     private var lastPersistTime: Date = .distantPast
+
+    /// Set externally by AppDelegate to enable anomaly detection and notifications.
+    var anomalyDetector: AnomalyDetector?
 
     /// Maps each PID to its last-observed accumulated CPU nanoseconds and the
     /// wall-clock nanoseconds (`DispatchTime.now().uptimeNanoseconds`) at
@@ -161,6 +164,8 @@ class ProcessMonitor: ObservableObject {
 
         let cpuFrac = sampleSystemCPU()
         let (ramUsed, ramTotal, pressure) = sampleSystemRAM()
+
+        anomalyDetector?.evaluate(processes: sorted, pressure: pressure)
 
         DispatchQueue.main.async {
             self.processes = sorted

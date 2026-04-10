@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import Combine
+import UserNotifications
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
@@ -23,6 +24,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         setupPopover()
+        setupNotifications()
         monitor.startMonitoring()
 
         // Update badge with process count after each sample
@@ -50,6 +52,36 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         monitor.stopMonitoring()
+    }
+
+    private func setupNotifications() {
+        let center = UNUserNotificationCenter.current()
+
+        // Request permission to show alerts and play sounds.
+        center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
+
+        // Register the "MEMORY_ANOMALY" category with Restart Now and Ignore actions.
+        let restartAction = UNNotificationAction(
+            identifier: "RESTART_NOW",
+            title: "Restart Now",
+            options: .foreground
+        )
+        let ignoreAction = UNNotificationAction(
+            identifier: "IGNORE",
+            title: "Ignore",
+            options: []
+        )
+        let category = UNNotificationCategory(
+            identifier: "MEMORY_ANOMALY",
+            actions: [restartAction, ignoreAction],
+            intentIdentifiers: [],
+            options: []
+        )
+        center.setNotificationCategories([category])
+
+        // Create anomaly detector and wire it into the process monitor.
+        let detector = AnomalyDetector(dataStore: monitor.dataStore, prefs: prefs)
+        monitor.anomalyDetector = detector
     }
 
     private func setupPopover() {
