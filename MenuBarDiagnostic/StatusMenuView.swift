@@ -8,6 +8,7 @@ struct StatusMenuView: View {
     var onSettingsTap: () -> Void
     var onClosePopover: () -> Void = {}
     @State private var expandedPID: pid_t? = nil
+    @State private var hoveredFooterButton: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -53,11 +54,11 @@ struct StatusMenuView: View {
         return AnyView(
             Text("Bouncer is learning… smart alerts start in \(daysRemaining) day\(daysRemaining == 1 ? "" : "s")")
                 .font(.caption)
-                .foregroundColor(.primary)
+                .foregroundColor(.orange)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(Color.yellow.opacity(0.85))
+                .background(Color.orange.opacity(0.12))
         )
     }
 
@@ -135,24 +136,27 @@ struct StatusMenuView: View {
                 NSApp.orderFrontStandardAboutPanel(nil)
             }
             .buttonStyle(.plain)
-            .foregroundColor(.secondary)
+            .foregroundColor(hoveredFooterButton == "about" ? .primary : .secondary)
             .font(.caption)
+            .onHover { hoveredFooterButton = $0 ? "about" : nil }
             Spacer()
             Button("Settings") {
                 onClosePopover()
                 onSettingsTap()
             }
             .buttonStyle(.plain)
-            .foregroundColor(.secondary)
+            .foregroundColor(hoveredFooterButton == "settings" ? .primary : .secondary)
             .font(.caption)
+            .onHover { hoveredFooterButton = $0 ? "settings" : nil }
             Spacer()
             Button("Quit") {
                 onClosePopover()
                 NSApp.terminate(nil)
             }
             .buttonStyle(.plain)
-            .foregroundColor(.secondary)
+            .foregroundColor(hoveredFooterButton == "quit" ? .primary : .secondary)
             .font(.caption)
+            .onHover { hoveredFooterButton = $0 ? "quit" : nil }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -173,9 +177,10 @@ private struct ProcessRowView: View {
         VStack(spacing: 0) {
             rowContent
                 .contentShape(Rectangle())
-                .onTapGesture { onTap() }
+                .onTapGesture { withAnimation(.easeInOut(duration: 0.2)) { onTap() } }
             if isExpanded {
                 detailCard
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .background(isAnomalous ? Color.orange.opacity(0.08) : Color.clear)
@@ -248,14 +253,16 @@ private struct ProcessRowView: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
                 .tint(.orange)
-                Button("Add to Ignore List") {
-                    if let bid = process.bundleIdentifier,
-                       !prefs.ignoredBundleIDs.contains(bid) {
-                        prefs.ignoredBundleIDs.append(bid)
+                if isAnomalous {
+                    Button("Add to Ignore List") {
+                        if let bid = process.bundleIdentifier,
+                           !prefs.ignoredBundleIDs.contains(bid) {
+                            prefs.ignoredBundleIDs.append(bid)
+                        }
                     }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
             }
         }
         .padding(.horizontal, 12)
