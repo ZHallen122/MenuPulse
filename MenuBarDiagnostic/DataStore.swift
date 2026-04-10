@@ -17,6 +17,18 @@ final class DataStore {
         }
     }
 
+    /// Opens a SQLite database at an explicit path. Pass `":memory:"` for an
+    /// in-memory database suitable for unit tests.
+    init(path: String) {
+        queue.async { [weak self] in
+            var dbPtr: OpaquePointer?
+            if sqlite3_open(path, &dbPtr) == SQLITE_OK {
+                self?.db = dbPtr
+            }
+            self?.createTablesIfNeeded()
+        }
+    }
+
     deinit {
         if let db = db { sqlite3_close(db) }
     }
