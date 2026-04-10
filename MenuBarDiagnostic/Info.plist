@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>com.allenz.MenuBarDiagnostic</string>
+    <string>com.allenz.Bouncer</string>
     <key>CFBundleName</key>
-    <string>Menu Bar Diagnostic</string>
+    <string>Bouncer</string>
     <key>CFBundleDisplayName</key>
-    <string>Menu Bar Diagnostic</string>
+    <string>Bouncer</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundlePackageType</key>
