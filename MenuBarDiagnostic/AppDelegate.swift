@@ -8,6 +8,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
     private var hudWindow: HUDWindow?
+    private var settingsWindow: NSWindow?
     private var cancellables = Set<AnyCancellable>()
 
     let prefs = PreferencesManager()
@@ -104,12 +105,39 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupPopover() {
-        let vc = NSHostingController(rootView: StatusMenuView(monitor: monitor, prefs: prefs, anomalyDetector: anomalyDetector))
+        let vc = NSHostingController(rootView: StatusMenuView(
+            monitor: monitor,
+            prefs: prefs,
+            anomalyDetector: anomalyDetector,
+            onSettingsTap: { [weak self] in self?.openSettings() }
+        ))
         let pop = NSPopover()
         pop.contentViewController = vc
         pop.contentSize = NSSize(width: 300, height: 400)
         pop.behavior = .transient
         self.popover = pop
+    }
+
+    func openSettings() {
+        if let win = settingsWindow, win.isVisible {
+            win.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        let win = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 320),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
+        win.title = "Bouncer Settings"
+        win.contentView = NSHostingView(rootView: SettingsView(prefs: prefs))
+        win.setContentSize(NSSize(width: 400, height: 320))
+        win.contentMinSize = NSSize(width: 400, height: 320)
+        win.center()
+        settingsWindow = win
+        win.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     @objc private func handleStatusBarClick(_ sender: AnyObject?) {

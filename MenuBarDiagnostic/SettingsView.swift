@@ -2,46 +2,47 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var prefs: PreferencesManager
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Settings")
-                .font(.headline)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Ignored Bundle IDs")
-                    .font(.subheadline)
-                TextField("com.example.App, …", text: $prefs.ignoredBundleIDsRaw)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.caption.monospaced())
-                Text("Comma-separated. Matching apps are excluded from scanning.")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Alert Sensitivity")
-                    .font(.subheadline)
-                Picker("", selection: $prefs.sensitivity) {
-                    ForEach(Sensitivity.allCases, id: \.self) { s in
-                        Text(s.label).tag(s)
+        TabView {
+            Form {
+                Section {
+                    Picker("Sensitivity", selection: $prefs.sensitivity) {
+                        ForEach(Sensitivity.allCases, id: \.self) { s in
+                            Text(s.label).tag(s)
+                        }
                     }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("Alerts")
+                } footer: {
+                    Text("Controls how aggressively Bouncer flags memory anomalies. Higher sensitivity may produce more alerts.")
+                        .foregroundColor(.secondary)
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
+
+                Section {
+                    TextField("com.example.App, …", text: $prefs.ignoredBundleIDsRaw)
+                        .font(.caption.monospaced())
+                } header: {
+                    Text("Exclusions")
+                } footer: {
+                    Text("Comma-separated bundle IDs. Matching apps are excluded from anomaly scanning.")
+                        .foregroundColor(.secondary)
+                }
+
+                Section {
+                    Toggle("Launch at Login", isOn: $prefs.launchAtLogin)
+                } header: {
+                    Text("System")
+                } footer: {
+                    Text("Automatically start Bouncer when you log in.")
+                        .foregroundColor(.secondary)
+                }
             }
-
-            Toggle("Launch at login", isOn: $prefs.launchAtLogin)
-
-            HStack {
-                Spacer()
-                Button("Done") { dismiss() }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
+            .tabItem {
+                Label("General", systemImage: "gear")
             }
         }
-        .padding(16)
-        .frame(width: 300)
+        .frame(minWidth: 400, minHeight: 320)
     }
 }
