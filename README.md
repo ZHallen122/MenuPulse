@@ -35,9 +35,10 @@ The icon color reflects current system memory pressure at a glance:
 ## Architecture
 
 ```
-AppDelegate
-├── NSStatusItem (stethoscope icon, green/orange/red tint)
-└── NSPopover → StatusMenuView (SwiftUI)
+MenuBarDiagnosticApp (@main, SwiftUI App)
+└── AppDelegate (via @NSApplicationDelegateAdaptor)
+    ├── NSStatusItem (stethoscope icon, green/orange/red tint)
+    └── NSPopover → HUDView (SwiftUI)
 
 ProcessMonitor  ──samples every 2s──►  AnomalyDetector
      │                                       │
@@ -61,12 +62,21 @@ ProcessMonitor  ──samples every 2s──►  AnomalyDetector
 
 | File | Role |
 |---|---|
-| `AppDelegate.swift` | App entry point; owns `NSStatusItem`, `NSPopover`, notification handling |
+| `MenuBarDiagnosticApp.swift` | SwiftUI `@main` entry point; wires `AppDelegate` via `@NSApplicationDelegateAdaptor` |
+| `AppDelegate.swift` | Owns `NSStatusItem`, `NSPopover`, notification handling |
 | `ProcessMonitor.swift` | Sampling engine; publishes `[MenuBarProcess]` and system memory pressure |
 | `AnomalyDetector.swift` | Three-condition evaluator; posts notifications; owns anomaly timers and cooldowns |
 | `DataStore.swift` | SQLite wrapper; stores per-app samples, computes p90 baseline |
 | `MenuBarProcess.swift` | Immutable value-type snapshot of a single process |
 | `StatusMenuView.swift` | SwiftUI popover root; shows process list with sparklines and anomaly highlights |
+| `HUDView.swift` | Main popover HUD listing all monitored processes |
+| `HUDWindow.swift` | `NSWindow` subclass that hosts the HUD |
+| `HUDProcessRow.swift` | Single process row with alert-threshold highlighting |
+| `ThermalHeaderView.swift` | Header showing system thermal/memory pressure state |
+| `RAMBarView.swift` | Visual RAM usage bar component |
+| `MemoryPressure.swift` | System memory pressure reading utilities |
+| `ProcessDetailSheet.swift` | Expanded detail sheet for a single process |
+| `ThermalState+Display.swift` | Extension adding display strings to `ProcessInfo.ThermalState` |
 | `SparklineView.swift` | `Canvas`-based rolling memory sparkline |
 | `PreferencesManager.swift` | `ObservableObject` wrapping `@AppStorage` user preferences |
 | `SettingsView.swift` | SwiftUI settings UI (ignore list, sensitivity, launch at login) |
@@ -98,9 +108,21 @@ ProcessMonitor  ──samples every 2s──►  AnomalyDetector
 ### Command-line build
 
 ```bash
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 xcodebuild -project "Menu Bar Diagnostic.xcodeproj" \
            -scheme "Menu Bar Diagnostic" \
            -configuration Debug build
+```
+
+### Running tests
+
+The main scheme is not configured for testing. Use the dedicated test scheme:
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+xcodebuild -project "Menu Bar Diagnostic.xcodeproj" \
+           -scheme "MenuBarDiagnosticTests" \
+           -configuration Debug test
 ```
 
 ---
