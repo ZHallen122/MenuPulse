@@ -17,7 +17,7 @@ struct ThermalHeaderView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Menu Bar Diagnostic")
+                        Text("Bouncer")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(.white)
                         Label(thermalState.thermalLabel, systemImage: thermalState.thermalIcon)

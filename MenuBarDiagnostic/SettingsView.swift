@@ -6,7 +6,7 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section {
-                Picker("Sensitivity:", selection: $prefs.sensitivity) {
+                Picker("Sensitivity", selection: $prefs.sensitivity) {
                     ForEach(Sensitivity.allCases, id: \.self) { s in
                         Text(s.label).tag(s)
                     }
@@ -20,7 +20,7 @@ struct SettingsView: View {
             }
 
             Section {
-                TextField("Ignore Apps:", text: $prefs.ignoredBundleIDsRaw, prompt: Text("com.example.App, …"))
+                TextField("Ignore Apps", text: $prefs.ignoredBundleIDsRaw, prompt: Text("com.example.App, …"))
                     .font(.caption.monospaced())
             } header: {
                 Text("Exclusions")
@@ -31,11 +31,17 @@ struct SettingsView: View {
 
             Section {
                 Toggle("Launch at Login", isOn: $prefs.launchAtLogin)
-                Toggle("Show Memory Pressure", isOn: $prefs.showMemoryPressureInMenuBar)
             } header: {
                 Text("System")
             } footer: {
-                Text("Automatically start Bouncer when you log in. Memory Pressure shows RAM usage % next to the menu bar icon.")
+                Text("Starts Bouncer automatically when you log in.")
+                    .foregroundColor(.secondary)
+            }
+
+            Section {
+                Toggle("Show Memory Pressure", isOn: $prefs.showMemoryPressureInMenuBar)
+            } footer: {
+                Text("Displays RAM usage % next to the menu bar icon.")
                     .foregroundColor(.secondary)
             }
         }
