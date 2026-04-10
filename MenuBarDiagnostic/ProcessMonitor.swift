@@ -22,6 +22,10 @@ class ProcessMonitor: ObservableObject {
     /// Bytes of RAM currently in use (active + wired + compressor pages × page size).
     @Published var systemRAMUsedBytes: UInt64 = 0
 
+    /// Current system memory pressure derived from available page ratios.
+    /// Updated each sample tick alongside other published stats.
+    @Published var memoryPressure: MemoryPressure = .normal
+
     /// Total physical RAM installed, read once via `sysctlbyname("hw.memsize")`
     /// and cached for the lifetime of the monitor.
     @Published var systemRAMTotalBytes: UInt64 = 0
@@ -79,7 +83,7 @@ class ProcessMonitor: ObservableObject {
         let wallNow = DispatchTime.now().uptimeNanoseconds
 
         let accessoryApps = NSWorkspace.shared.runningApplications.filter {
-            $0.activationPolicy == .accessory
+            $0.activationPolicy != .prohibited
         }
 
         var newProcesses: [MenuBarProcess] = []
@@ -117,6 +121,14 @@ class ProcessMonitor: ObservableObject {
             if history.count > 20 { history.removeFirst(history.count - 20) }
             cpuHistories[pid] = history
 
+            // Read physical memory footprint via proc_pid_rusage (more accurate than
+            // pti_resident_size; matches Activity Monitor's "Memory" column).
+            var rusageInfo = rusage_info_v4()
+            let rusageRet = withUnsafeMutablePointer(to: &rusageInfo) { ptr in
+                proc_pid_rusage(pid, RUSAGE_INFO_V4, UnsafeMutableRawPointer(ptr))
+            }
+            let memFootprint: UInt64 = (rusageRet == 0) ? rusageInfo.ri_phys_footprint : 0
+
             newProcesses.append(MenuBarProcess(
                 pid: pid,
                 name: app.localizedName ?? "Unknown",
@@ -124,7 +136,7 @@ class ProcessMonitor: ObservableObject {
                 icon: app.icon,
                 cpuFraction: cpuFraction,
                 cpuHistory: history,
-                residentMemoryBytes: info.pti_resident_size,
+                memoryFootprintBytes: memFootprint,
                 thermalState: thermalState,
                 launchDate: app.launchDate
             ))
@@ -138,13 +150,14 @@ class ProcessMonitor: ObservableObject {
         let sorted = newProcesses.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
 
         let cpuFrac = sampleSystemCPU()
-        let (ramUsed, ramTotal) = sampleSystemRAM()
+        let (ramUsed, ramTotal, pressure) = sampleSystemRAM()
 
         DispatchQueue.main.async {
             self.processes = sorted
             self.systemCPUFraction = cpuFrac
             self.systemRAMUsedBytes = ramUsed
             self.systemRAMTotalBytes = ramTotal
+            self.memoryPressure = pressure
         }
     }
 
@@ -188,16 +201,18 @@ class ProcessMonitor: ObservableObject {
         return result
     }
 
-    /// Returns `(usedBytes, totalBytes)` for system RAM.
+    /// Returns `(usedBytes, totalBytes, pressure)` for system RAM.
     ///
     /// - **Total** is read once from `sysctlbyname("hw.memsize")` and cached in
     ///   `cachedTotalRAMBytes` for all future calls.
     /// - **Used** is computed as `(active + wired + compressor) × pageSize`,
-    ///   which matches the "used" figure shown in Activity Monitor. Free and
-    ///   inactive pages are excluded.
+    ///   which matches the "used" figure shown in Activity Monitor.
+    /// - **Pressure** is derived from the available-page ratio
+    ///   `(free + inactive + purgeable) / totalPages`:
+    ///   `.normal` > 25 %, `.warning` > 10 %, `.critical` ≤ 10 %.
     ///
-    /// Returns `(0, cachedTotalRAMBytes)` if `host_statistics64` fails.
-    private func sampleSystemRAM() -> (used: UInt64, total: UInt64) {
+    /// Returns `(0, cachedTotalRAMBytes, .normal)` if `host_statistics64` fails.
+    private func sampleSystemRAM() -> (used: UInt64, total: UInt64, pressure: MemoryPressure) {
         if cachedTotalRAMBytes == 0 {
             var total: UInt64 = 0
             var size = MemoryLayout<UInt64>.size
@@ -214,7 +229,7 @@ class ProcessMonitor: ObservableObject {
                 host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
             }
         }
-        guard kr == KERN_SUCCESS else { return (0, cachedTotalRAMBytes) }
+        guard kr == KERN_SUCCESS else { return (0, cachedTotalRAMBytes, .normal) }
 
         var pageSize: vm_size_t = 0
         host_page_size(mach_host_self(), &pageSize)
@@ -225,6 +240,16 @@ class ProcessMonitor: ObservableObject {
             + UInt64(vmStats.compressor_page_count)
         let usedBytes = usedPages * ps
 
-        return (usedBytes, cachedTotalRAMBytes)
+        // Compute memory pressure from the ratio of available pages to total pages.
+        let free      = UInt64(vmStats.free_count)
+        let inactive  = UInt64(vmStats.inactive_count)
+        let purgeable = UInt64(vmStats.purgeable_count)
+        let totalPages = ps > 0 ? cachedTotalRAMBytes / ps : 1
+        let availableRatio = Double(free + inactive + purgeable) / Double(totalPages)
+        let pressure: MemoryPressure = availableRatio > 0.25 ? .normal
+                                     : availableRatio > 0.10 ? .warning
+                                     : .critical
+
+        return (usedBytes, cachedTotalRAMBytes, pressure)
     }
 }

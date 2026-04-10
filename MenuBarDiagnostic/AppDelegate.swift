@@ -32,6 +32,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.statusItem?.button?.title = processes.isEmpty ? "" : "\(processes.count)"
             }
             .store(in: &cancellables)
+
+        // Update icon tint color to reflect system memory pressure.
+        monitor.$memoryPressure
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] pressure in
+                let color: NSColor
+                switch pressure {
+                case .normal:   color = .systemGreen
+                case .warning:  color = .systemOrange
+                case .critical: color = .systemRed
+                }
+                self?.statusItem?.button?.contentTintColor = color
+            }
+            .store(in: &cancellables)
     }
 
     func applicationWillTerminate(_ notification: Notification) {

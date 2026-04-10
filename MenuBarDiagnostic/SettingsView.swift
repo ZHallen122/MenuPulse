@@ -27,6 +27,32 @@ struct SettingsView: View {
                 Slider(value: $prefs.ramAlertThresholdMB, in: 50...2000, step: 50)
             }
 
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Alert Sensitivity")
+                    .font(.subheadline)
+                Picker("", selection: $prefs.sensitivity) {
+                    ForEach(Sensitivity.allCases, id: \.self) { s in
+                        Text(s.label).tag(s)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                Text(sensitivityHint)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Ignored Bundle IDs")
+                    .font(.subheadline)
+                TextField("com.example.App, …", text: $prefs.ignoredBundleIDsRaw)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.caption.monospaced())
+                Text("Comma-separated. Matching apps are excluded from scanning.")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+
             HStack {
                 Spacer()
                 Button("Done") { dismiss() }
@@ -35,6 +61,14 @@ struct SettingsView: View {
             }
         }
         .padding(16)
-        .frame(width: 280)
+        .frame(width: 300)
+    }
+
+    private var sensitivityHint: String {
+        switch prefs.sensitivity {
+        case .conservative: return "Thresholds doubled — fewer alerts."
+        case .default_:     return "Default thresholds."
+        case .aggressive:   return "Thresholds halved — more alerts."
+        }
     }
 }
