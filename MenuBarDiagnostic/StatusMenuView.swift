@@ -6,6 +6,7 @@ struct StatusMenuView: View {
     @ObservedObject var prefs: PreferencesManager
     @ObservedObject var anomalyDetector: AnomalyDetector
     var onSettingsTap: () -> Void
+    var onClosePopover: () -> Void = {}
     @State private var expandedPID: pid_t? = nil
 
     var body: some View {
@@ -20,6 +21,19 @@ struct StatusMenuView: View {
         .frame(width: 300)
     }
 
+    // MARK: - Learning Period
+
+    private var isInLearningPeriod: Bool {
+        let defaults = UserDefaults.standard
+        let firstLaunch: Date = {
+            if let d = defaults.object(forKey: "firstLaunchDate") as? Date { return d }
+            let now = Date()
+            defaults.set(now, forKey: "firstLaunchDate")
+            return now
+        }()
+        return Date().timeIntervalSince(firstLaunch) < 3 * 86400
+    }
+
     // MARK: - Summary Header
 
     private var summaryHeader: some View {
@@ -28,9 +42,15 @@ struct StatusMenuView: View {
         return VStack(alignment: .leading, spacing: 2) {
             Text("\(appCount) app\(appCount == 1 ? "" : "s") running")
                 .font(.headline)
-            Text("\(anomalyCount) behaving abnormally")
-                .font(.caption)
-                .foregroundColor(anomalyCount > 0 ? .orange : .secondary)
+            if isInLearningPeriod {
+                Text("Learning your apps…")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            } else {
+                Text("\(anomalyCount) behaving abnormally")
+                    .font(.caption)
+                    .foregroundColor(anomalyCount > 0 ? .orange : .secondary)
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -53,7 +73,7 @@ struct StatusMenuView: View {
         return AnyView(
             Text("Bouncer is learning… smart alerts start in \(daysRemaining) day\(daysRemaining == 1 ? "" : "s")")
                 .font(.caption)
-                .foregroundColor(.black)
+                .foregroundColor(.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
@@ -106,7 +126,6 @@ struct StatusMenuView: View {
                             )
                             Divider()
                         }
-                        Divider()
                     }
                     ForEach(normalProcesses) { process in
                         ProcessRowView(
@@ -131,20 +150,29 @@ struct StatusMenuView: View {
 
     private var footerBar: some View {
         HStack {
-            Button("About") { NSApp.orderFrontStandardAboutPanel(nil) }
-                .buttonStyle(.plain)
-                .foregroundColor(.secondary)
-                .font(.caption)
+            Button("About") {
+                onClosePopover()
+                NSApp.orderFrontStandardAboutPanel(nil)
+            }
+            .buttonStyle(.plain)
+            .foregroundColor(.secondary)
+            .font(.caption)
             Spacer()
-            Button("Settings") { onSettingsTap() }
-                .buttonStyle(.plain)
-                .foregroundColor(.secondary)
-                .font(.caption)
+            Button("Settings") {
+                onClosePopover()
+                onSettingsTap()
+            }
+            .buttonStyle(.plain)
+            .foregroundColor(.secondary)
+            .font(.caption)
             Spacer()
-            Button("Quit") { NSApp.terminate(nil) }
-                .buttonStyle(.plain)
-                .foregroundColor(.secondary)
-                .font(.caption)
+            Button("Quit") {
+                onClosePopover()
+                NSApp.terminate(nil)
+            }
+            .buttonStyle(.plain)
+            .foregroundColor(.secondary)
+            .font(.caption)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
