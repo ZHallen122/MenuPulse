@@ -126,10 +126,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func applyLaunchAtLogin(_ enabled: Bool) {
-        if enabled {
-            try? SMAppService.mainApp.register()
-        } else {
-            try? SMAppService.mainApp.unregister()
+        do {
+            if enabled {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+        } catch {
+            NSLog("SMAppService error: %@", error.localizedDescription)
         }
     }
 

@@ -196,11 +196,18 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
 
         // Pre-compute the app URL before terminating so we don't need to capture workspace.
         let appURL = workspace.urlForApplication(withBundleIdentifier: bundleID)
-        app.terminate()
+        let terminated = app.terminate()
+        if !terminated {
+            NSLog("AnomalyDetector: terminate() returned false for %@ (%@)", appName, bundleID)
+        }
 
         DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
             guard let url = appURL else { return }
-            NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+            NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration()) { _, error in
+                if let error = error {
+                    NSLog("AnomalyDetector: failed to relaunch %@ (%@): %@", appName, bundleID, error.localizedDescription)
+                }
+            }
         }
     }
 }
