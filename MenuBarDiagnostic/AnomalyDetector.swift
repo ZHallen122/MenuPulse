@@ -140,9 +140,9 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
         content.title = "\(appName) memory abnormal"
         if currentMB >= 1000 {
             let gb = currentMB / 1024.0
-            content.body = String(format: "Using %.1f GB — %.1fx its normal level", gb, ratio)
+            content.body = String(format: "Using %.1f GB — %.1fx its normal level. System memory pressure is elevated.", gb, ratio)
         } else {
-            content.body = String(format: "Using %.0f MB — %.1fx its normal level", currentMB, ratio)
+            content.body = String(format: "Using %.0f MB — %.1fx its normal level. System memory pressure is elevated.", currentMB, ratio)
         }
         content.sound = .default
         content.categoryIdentifier = "MEMORY_ANOMALY"

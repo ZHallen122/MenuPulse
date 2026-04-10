@@ -47,6 +47,8 @@ class PreferencesManager: ObservableObject {
     /// Sensitivity level stored as its raw String value.
     @AppStorage("sensitivity") var sensitivity: Sensitivity = .default_
 
+    @AppStorage("launchAtLogin") var launchAtLogin: Bool = false
+
     /// Bundle IDs to exclude from scanning, stored as a comma-joined string.
     @AppStorage("ignoredBundleIDsRaw") var ignoredBundleIDsRaw: String = ""
 

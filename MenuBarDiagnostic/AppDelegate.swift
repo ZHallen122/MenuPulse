@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import Combine
 import UserNotifications
+import ServiceManagement
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
@@ -28,11 +29,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupNotifications()
         monitor.startMonitoring()
 
-        // Update badge with process count after each sample
+        // No badge — icon color conveys status
         monitor.$processes
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] processes in
-                self?.statusItem?.button?.title = processes.isEmpty ? "" : "\(processes.count)"
+            .sink { [weak self] _ in
+                self?.statusItem?.button?.title = ""
+            }
+            .store(in: &cancellables)
+
+        // Launch at login — apply stored value on launch, then observe UserDefaults changes
+        applyLaunchAtLogin(prefs.launchAtLogin)
+        NotificationCenter.default
+            .publisher(for: UserDefaults.didChangeNotification)
+            .map { _ in UserDefaults.standard.bool(forKey: "launchAtLogin") }
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                self?.applyLaunchAtLogin(enabled)
             }
             .store(in: &cancellables)
 
@@ -109,6 +122,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
+        }
+    }
+
+    private func applyLaunchAtLogin(_ enabled: Bool) {
+        if enabled {
+            try? SMAppService.mainApp.register()
+        } else {
+            try? SMAppService.mainApp.unregister()
         }
     }
 
