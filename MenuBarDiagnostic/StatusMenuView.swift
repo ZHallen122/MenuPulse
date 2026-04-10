@@ -21,19 +21,6 @@ struct StatusMenuView: View {
         .frame(width: 300)
     }
 
-    // MARK: - Learning Period
-
-    private var isInLearningPeriod: Bool {
-        let defaults = UserDefaults.standard
-        let firstLaunch: Date = {
-            if let d = defaults.object(forKey: "firstLaunchDate") as? Date { return d }
-            let now = Date()
-            defaults.set(now, forKey: "firstLaunchDate")
-            return now
-        }()
-        return Date().timeIntervalSince(firstLaunch) < 3 * 86400
-    }
-
     // MARK: - Summary Header
 
     private var summaryHeader: some View {
@@ -42,7 +29,7 @@ struct StatusMenuView: View {
         return VStack(alignment: .leading, spacing: 2) {
             Text("\(appCount) app\(appCount == 1 ? "" : "s") running")
                 .font(.headline)
-            if isInLearningPeriod {
+            if prefs.isInLearningPeriod {
                 Text("Learning your apps…")
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -59,14 +46,7 @@ struct StatusMenuView: View {
     // MARK: - Learning Banner
 
     private var learningBanner: some View {
-        let defaults = UserDefaults.standard
-        let firstLaunch: Date = {
-            if let d = defaults.object(forKey: "firstLaunchDate") as? Date { return d }
-            let now = Date()
-            defaults.set(now, forKey: "firstLaunchDate")
-            return now
-        }()
-        let elapsed = Date().timeIntervalSince(firstLaunch)
+        let elapsed = Date().timeIntervalSince(prefs.firstLaunchDate)
         let learningPeriod: TimeInterval = 3 * 86400
         guard elapsed < learningPeriod else { return AnyView(EmptyView()) }
         let daysRemaining = max(1, Int(ceil((learningPeriod - elapsed) / 86400)))

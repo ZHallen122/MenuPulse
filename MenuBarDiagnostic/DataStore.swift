@@ -35,7 +35,7 @@ final class DataStore {
 
     // MARK: - Public API
 
-    /// Inserts a row for every process in `processes` (INSERT OR IGNORE).
+    /// Inserts a row for every process in `processes`.
     func persistSamples(_ processes: [MenuBarProcess]) {
         queue.async { [weak self] in
             self?.insertSamples(processes)
@@ -120,7 +120,7 @@ final class DataStore {
     private func insertSamples(_ processes: [MenuBarProcess]) {
         guard let db = db else { return }
         let now = Int64(Date().timeIntervalSince1970)
-        let sql = "INSERT OR IGNORE INTO memory_samples (pid, bundle_id, app_name, memory_mb, sampled_at) VALUES (?, ?, ?, ?, ?);"
+        let sql = "INSERT INTO memory_samples (pid, bundle_id, app_name, memory_mb, sampled_at) VALUES (?, ?, ?, ?, ?);"
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
         defer { sqlite3_finalize(stmt) }

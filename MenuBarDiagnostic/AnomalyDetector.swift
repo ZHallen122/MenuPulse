@@ -21,9 +21,11 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
     @Published var anomalousBundleIDs: Set<String> = []
 
     /// Tracks when each bundle ID first entered an anomalous state (all 3 conditions met).
+    // internal (not private) so tests can pre-seed
     var anomalyStartDates: [String: Date] = [:]
 
     /// Tracks when the last notification was sent per bundle ID (24 h cooldown).
+    // internal (not private) so tests can pre-seed
     var lastNotificationDates: [String: Date] = [:]
 
     init(dataStore: DataStore, prefs: PreferencesManager) {
@@ -39,6 +41,13 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
     /// Evaluate all running processes against the three anomaly conditions.
     /// Called from ProcessMonitor after each DataStore persist tick.
     func evaluate(processes: [MenuBarProcess], pressure: MemoryPressure) {
+        // Suppress all anomaly detection and notifications during the 3-day learning period.
+        guard !prefs.isInLearningPeriod else {
+            anomalyStartDates.removeAll()
+            DispatchQueue.main.async { self.anomalousBundleIDs = [] }
+            return
+        }
+
         // Condition 3: system memory pressure must be .warning or .critical
         guard pressure == .warning || pressure == .critical else {
             anomalyStartDates.removeAll()
