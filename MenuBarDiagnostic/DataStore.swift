@@ -24,6 +24,8 @@ final class DataStore {
             var dbPtr: OpaquePointer?
             if sqlite3_open(path, &dbPtr) == SQLITE_OK {
                 self?.db = dbPtr
+            } else {
+                NSLog("DataStore: sqlite3_open failed for path %@: %@", path, String(cString: sqlite3_errmsg(dbPtr)))
             }
             self?.createTablesIfNeeded()
         }
@@ -84,6 +86,7 @@ final class DataStore {
         try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
         let dbPath = dir.appendingPathComponent("diagnostics.sqlite3").path
         if sqlite3_open(dbPath, &db) != SQLITE_OK {
+            NSLog("DataStore: sqlite3_open failed for path %@: %@", dbPath, String(cString: sqlite3_errmsg(db)))
             db = nil
         }
     }
