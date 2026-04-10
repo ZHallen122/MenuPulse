@@ -1,83 +1,79 @@
-# Menu Bar Diagnostic
+# Bouncer
 
-A native macOS menu bar app that monitors all other menu bar processes in real time — showing per-process CPU, RAM, sparkline history, and a live thermal heatmap header.
+A native macOS menu bar app that watches other menu bar apps for memory anomalies and sends actionable alerts before they slow your system down.
 
-<!-- screenshot: menu-bar-icon -->
+---
+
+## What it does
+
+Bouncer sits in your menu bar as a stethoscope icon. It silently monitors the memory usage of every other menu bar app running on your Mac. When a process shows a sustained, upward memory trend that pushes into elevated system memory pressure, Bouncer notifies you — with a **Restart Now** or **Ignore** action — so you can act before the app causes a slowdown.
+
+The icon color reflects current system memory pressure at a glance:
+
+| Color | Meaning |
+|---|---|
+| Green | Normal |
+| Orange | Warning |
+| Red | Critical |
 
 ---
 
 ## Features
 
-- **Live process list** — Shows every running accessory-policy app (i.e. menu bar apps) with CPU%, RAM, and app icon.
-- **Sparkline CPU history** — Rolling 20-sample sparkline chart per process showing CPU trend over time.
-- **RAM bar views** — Visual proportional RAM bars for quick at-a-glance comparison.
-- **Thermal state heatmap header** — Color-coded header that reflects the system's current thermal pressure (nominal → fair → serious → critical).
-- **System-wide CPU & RAM** — Aggregate CPU fraction via `host_statistics` tick deltas; RAM via `vm_statistics64` (active + wired + compressor pages).
-- **Alert glow on CPU hogs** — Rows with sustained high CPU pulse with a red glow animation.
-- **Animated gradient border** — HUD overlay uses an animated gradient border for a glass-morphism aesthetic.
-- **HUD overlay** — Floating always-on-top window (Option+click the status icon to toggle).
-- **Process detail sheet** — Tap any row to open a detail sheet showing open file descriptor count and a SIGTERM kill button.
-- **Badge count** — Status bar icon shows the number of currently running menu bar processes.
-- **Settings sheet** — Configure refresh interval, CPU alert threshold, and RAM alert threshold via `@AppStorage`-backed preferences.
-
-<!-- screenshot: status-menu-popover -->
-<!-- screenshot: hud-overlay -->
-<!-- screenshot: process-detail-sheet -->
-<!-- screenshot: settings-sheet -->
+- **Three-condition anomaly detection** — An app is flagged only when all three are true simultaneously:
+  1. Current memory > p90 baseline × sensitivity multiplier
+  2. 30-minute upward trend (linear regression slope > 0)
+  3. System memory pressure is Warning or Critical
+- **3-day learning period** — Bouncer collects a baseline before it fires any alerts, avoiding false positives on freshly-installed apps.
+- **Actionable notifications** — Each alert offers **Restart Now** (relaunches the offending app) or **Ignore**. A 24-hour per-app cooldown prevents repeat alerts for the same process.
+- **10-minute persistence gate** — An app must remain anomalous for 10 continuous minutes before a notification fires.
+- **Memory sparklines** — Click the status icon to open the popover and see rolling memory sparklines for every monitored app. Anomalous apps are highlighted in amber.
+- **Settings** — Configure the ignore list, sensitivity (Low / Medium / High), and launch at login.
 
 ---
 
-## Architecture Overview
+## Architecture
 
 ```
 AppDelegate
-├── NSStatusItem (stethoscope icon + badge count)
-├── NSPopover → StatusMenuView (SwiftUI)
-│   └── ProcessMonitor (ObservableObject)
-│       ├── [MenuBarProcess] — value types published each sample tick
-│       ├── systemCPUFraction — host_statistics tick delta
-│       └── systemRAMUsedBytes / systemRAMTotalBytes — vm_statistics64
-└── HUDWindow (NSWindow, borderless, always-on-top)
-    └── HUDView (SwiftUI root)
-        ├── ThermalHeaderView
-        ├── HUDProcessRow (per process)
-        │   ├── SparklineView
-        │   └── RAMBarView
-        └── ProcessDetailSheet (sheet overlay)
+├── NSStatusItem (stethoscope icon, green/orange/red tint)
+└── NSPopover → StatusMenuView (SwiftUI)
+
+ProcessMonitor  ──samples every 2s──►  AnomalyDetector
+     │                                       │
+     │  (accessory-policy processes)         │  evaluates 3 conditions
+     ▼                                       ▼
+ DataStore (SQLite)              UNUserNotificationCenter
+   per-app memory samples          "Restart Now" / "Ignore"
+   p90 baseline computation
 ```
 
-### Data Flow
+### Data flow
 
-1. **Sampling** — `ProcessMonitor.sample()` fires on a `Timer` at the configured refresh interval (default 2 s).
-2. **Per-process CPU** — `proc_pidinfo(PROC_PIDTASKINFO)` fetches accumulated CPU nanoseconds. Delta over wall-clock nanoseconds gives a 0–1 CPU fraction, capped at 1.0.
-3. **CPU history** — Each PID's fraction is appended to a rolling `[Double]` buffer (max 20 entries) stored in `cpuHistories`. Stale PIDs are pruned after each sample.
-4. **System CPU** — `host_statistics(HOST_CPU_LOAD_INFO)` returns tick counters. Wrapping-safe subtraction from the previous sample gives a per-interval fraction across user + sys + nice ticks.
-5. **System RAM** — `host_statistics64(HOST_VM_INFO64)` returns page counts. Active + wired + compressor pages × page size = used bytes. Total physical RAM is read once via `sysctlbyname("hw.memsize")` and cached.
-6. **Publishing** — Results are dispatched to the main queue and published as `@Published` properties, driving SwiftUI view updates.
-7. **User interaction** — Left-click toggles the `NSPopover`; Option+left-click toggles the `HUDWindow`.
+1. `ProcessMonitor` samples all running accessory-policy apps every 2 seconds via `proc_pidinfo`, collecting resident memory (MB) for each.
+2. Each sample is stored in `DataStore` (SQLite). The store computes the p90 baseline per bundle ID and prunes samples older than 3 days.
+3. `AnomalyDetector` evaluates the three conditions on every sample tick and publishes `anomalousBundleIDs`.
+4. After 10 continuous minutes of anomaly, `AnomalyDetector` posts a `UNUserNotification` for that app (subject to the 24-hour cooldown).
+5. `AppDelegate` handles the notification response: **Restart Now** terminates and relaunches the app; **Ignore** dismisses.
+6. `StatusMenuView` (in the popover) observes `ProcessMonitor` and `AnomalyDetector` and renders the process list with amber highlights for anomalous apps.
 
-### Key Components
+### Key files
 
 | File | Role |
 |---|---|
-| `ProcessMonitor.swift` | Sampling engine; owns the timer, previous-sample dictionaries, and publishes results |
-| `MenuBarProcess.swift` | Immutable value type snapshot of a single process; computed display properties |
-| `AppDelegate.swift` | App entry point; owns `NSStatusItem`, `NSPopover`, and `HUDWindow` |
-| `HUDView.swift` | Root SwiftUI view for the floating HUD overlay |
-| `HUDWindow.swift` | Custom `NSWindow` subclass — borderless, always-on-top, translucent |
-| `HUDProcessRow.swift` | Per-process row with sparkline and RAM bar |
-| `SparklineView.swift` | `Canvas`-based sparkline for CPU history |
-| `RAMBarView.swift` | Proportional horizontal RAM bar |
-| `ThermalHeaderView.swift` | Heatmap header row driven by `ProcessInfo.thermalState` |
-| `ThermalState+Display.swift` | Extension mapping `ThermalState` → label + color |
-| `StatusMenuView.swift` | SwiftUI root for the `NSPopover` content |
+| `AppDelegate.swift` | App entry point; owns `NSStatusItem`, `NSPopover`, notification handling |
+| `ProcessMonitor.swift` | Sampling engine; publishes `[MenuBarProcess]` and system memory pressure |
+| `AnomalyDetector.swift` | Three-condition evaluator; posts notifications; owns anomaly timers and cooldowns |
+| `DataStore.swift` | SQLite wrapper; stores per-app samples, computes p90 baseline |
+| `MenuBarProcess.swift` | Immutable value-type snapshot of a single process |
+| `StatusMenuView.swift` | SwiftUI popover root; shows process list with sparklines and anomaly highlights |
+| `SparklineView.swift` | `Canvas`-based rolling memory sparkline |
 | `PreferencesManager.swift` | `ObservableObject` wrapping `@AppStorage` user preferences |
-| `ProcessDetailSheet.swift` | Sheet showing open FD count + SIGTERM kill button |
-| `SettingsView.swift` | SwiftUI preferences UI |
+| `SettingsView.swift` | SwiftUI settings UI (ignore list, sensitivity, launch at login) |
 
 ---
 
-## Building and Running
+## Building and running
 
 ### Requirements
 
@@ -86,43 +82,36 @@ AppDelegate
 
 ### Steps
 
-1. Clone the repository:
+1. Clone the repository and open the project:
    ```bash
    git clone <repo-url>
    cd Menu-Bar-Diagnostic
-   ```
-
-2. Open the Xcode project:
-   ```bash
    open "Menu Bar Diagnostic.xcodeproj"
    ```
 
-3. Select the **Menu Bar Diagnostic** scheme and your Mac as the run destination.
+2. Select the **Menu Bar Diagnostic** scheme and your Mac as the run destination.
 
-4. Press **⌘R** to build and run.
+3. Press **⌘R** to build and run.
 
-> **Note:** The app has no main window. After launch it appears only as a stethoscope icon in the menu bar.
+> The app has no main window. After launch it appears only as a stethoscope icon in the menu bar.
 
-### Usage
+### Command-line build
 
-| Action | Result |
-|---|---|
-| Click status icon | Opens the process list popover |
-| Option+click status icon | Toggles the floating HUD overlay |
-| Click a process row | Opens the process detail sheet |
-| Kill button in detail sheet | Sends SIGTERM to the selected process |
+```bash
+xcodebuild -project "Menu Bar Diagnostic.xcodeproj" \
+           -scheme "Menu Bar Diagnostic" \
+           -configuration Debug build
+```
 
 ---
 
-## Code Signing & Entitlements
+## Settings
 
-`proc_pidinfo` requires that the calling process has sufficient privileges to inspect other processes. In practice:
-
-- **Development (local):** A standard developer-signed build (automatic signing in Xcode) works without any special entitlements on your own machine.
-- **Distribution outside the App Store:** The app needs the `com.apple.security.temporary-exception.mach-lookup` entitlement (or equivalent) to query arbitrary process task info. Add this to `MenuBarDiagnostic.entitlements` and request a Provisioning Profile that includes the exception.
-- **Mac App Store:** MAS sandboxing prevents `proc_pidinfo` on other processes entirely. Distribution via MAS would require a fundamentally different approach (e.g., an XPC helper with a privileged helper tool).
-
-For local development the default Xcode automatic signing team is sufficient — no manual entitlement changes are needed.
+| Setting | Description |
+|---|---|
+| Ignore list | Apps in this list are never monitored or alerted on |
+| Sensitivity | Low / Medium / High — adjusts the p90 multiplier threshold |
+| Launch at login | Registers/unregisters via `SMAppService` |
 
 ---
 

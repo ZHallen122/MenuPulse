@@ -18,7 +18,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "stethoscope", accessibilityDescription: "Menu Bar Diagnostic")
+            button.image = NSImage(systemSymbolName: "stethoscope", accessibilityDescription: "Bouncer")
             button.imagePosition = .imageLeft
             button.action = #selector(handleStatusBarClick(_:))
             button.target = self
@@ -72,7 +72,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let center = UNUserNotificationCenter.current()
 
         // Request permission to show alerts and play sounds.
-        center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+            if let error = error {
+                NSLog("Bouncer: notification authorization error: %@", error.localizedDescription)
+            } else if !granted {
+                NSLog("Bouncer: notification permission denied by user")
+            }
+        }
 
         // Register the "MEMORY_ANOMALY" category with Restart Now and Ignore actions.
         let restartAction = UNNotificationAction(
