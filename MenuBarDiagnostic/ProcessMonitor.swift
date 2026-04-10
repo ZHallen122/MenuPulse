@@ -60,6 +60,11 @@ class ProcessMonitor: ObservableObject {
     /// and reused on every subsequent call to avoid repeated `sysctlbyname` calls.
     private var cachedTotalRAMBytes: UInt64 = 0
 
+    /// Dedicated serial queue for all sampling work (syscalls + history mutation).
+    /// Keeps every access to previousSamples / cpuHistories / memoryHistories
+    /// off the main thread and serialised, avoiding data races.
+    private let sampleQueue = DispatchQueue(label: "com.bouncer.sampling", qos: .utility)
+
     init(prefs: PreferencesManager = PreferencesManager()) {
         self.prefs = prefs
     }
@@ -83,10 +88,19 @@ class ProcessMonitor: ObservableObject {
         timer = nil
     }
 
-    /// Performs a single sampling pass: queries every accessory-policy process
-    /// via `proc_pidinfo`, computes CPU deltas and CPU history, fetches
-    /// system-wide CPU and RAM, then publishes the results on the main queue.
+    /// Performs a single sampling pass off the main thread.
+    ///
+    /// Dispatches all syscalls (`proc_pidinfo`, `proc_pid_rusage`, `host_statistics64`)
+    /// to `sampleQueue` (a `.utility` serial queue) so that the main thread — and
+    /// therefore the UI — is never blocked by the loop. Results are published back
+    /// on the main queue once the pass is complete.
     private func sample() {
+        sampleQueue.async { [weak self] in
+            self?.sampleOnQueue()
+        }
+    }
+
+    private func sampleOnQueue() {
         let thermalState = ProcessInfo.processInfo.thermalState
         let wallNow = DispatchTime.now().uptimeNanoseconds
 
@@ -131,10 +145,16 @@ class ProcessMonitor: ObservableObject {
 
             // Read physical memory footprint via proc_pid_rusage (more accurate than
             // pti_resident_size; matches Activity Monitor's "Memory" column).
+            //
+            // Pointer bridging: proc_pid_rusage expects a rusage_info_t* (pointer-to-pointer).
+            // We must rebind rusageInfo's own address to that type so the C function writes
+            // directly into our struct — NOT into a local pointer variable (&voidPtr), which
+            // is only 8 bytes and causes a stack-smashing SIGABRT.
             var rusageInfo = rusage_info_v4()
-            let rusageRet = withUnsafeMutablePointer(to: &rusageInfo) { ptr -> Int32 in
-                var voidPtr: rusage_info_t? = UnsafeMutableRawPointer(ptr)
-                return proc_pid_rusage(pid, RUSAGE_INFO_V4, &voidPtr)
+            let rusageRet = withUnsafeMutablePointer(to: &rusageInfo) { ptr in
+                ptr.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { reboundPtr in
+                    proc_pid_rusage(pid, RUSAGE_INFO_V4, reboundPtr)
+                }
             }
             let memFootprint: UInt64 = (rusageRet == 0) ? rusageInfo.ri_phys_footprint : 0
 
