@@ -21,16 +21,19 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
     @Published var anomalousBundleIDs: Set<String> = []
 
     /// Tracks when each bundle ID first entered an anomalous state (all 3 conditions met).
-    private var anomalyStartDates: [String: Date] = [:]
+    var anomalyStartDates: [String: Date] = [:]
 
     /// Tracks when the last notification was sent per bundle ID (24 h cooldown).
-    private var lastNotificationDates: [String: Date] = [:]
+    var lastNotificationDates: [String: Date] = [:]
 
     init(dataStore: DataStore, prefs: PreferencesManager) {
         self.dataStore = dataStore
         self.prefs = prefs
         super.init()
-        UNUserNotificationCenter.current().delegate = self
+        // UNUserNotificationCenter requires a proper app bundle; skip in test runners.
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil {
+            UNUserNotificationCenter.current().delegate = self
+        }
     }
 
     /// Evaluate all running processes against the three anomaly conditions.
@@ -110,7 +113,7 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
     /// Computes the linear regression slope over the sample set.
     /// x = elapsed seconds from the first sample, y = memoryMB.
     /// A positive slope indicates memory is trending upward.
-    private func linearRegressionSlope(_ samples: [(memoryMB: Double, timestamp: Date)]) -> Double {
+    func linearRegressionSlope(_ samples: [(memoryMB: Double, timestamp: Date)]) -> Double {
         guard let first = samples.first else { return 0 }
         let n = Double(samples.count)
 
@@ -140,9 +143,9 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
         content.title = "\(appName) memory abnormal"
         if currentMB >= 1000 {
             let gb = currentMB / 1024.0
-            content.body = String(format: "Using %.1f GB — %.1fx its normal level", gb, ratio)
+            content.body = String(format: "Using %.1f GB — %.1fx its normal level. System memory pressure is elevated.", gb, ratio)
         } else {
-            content.body = String(format: "Using %.0f MB — %.1fx its normal level", currentMB, ratio)
+            content.body = String(format: "Using %.0f MB — %.1fx its normal level. System memory pressure is elevated.", currentMB, ratio)
         }
         content.sound = .default
         content.categoryIdentifier = "MEMORY_ANOMALY"
@@ -153,6 +156,7 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
             content: content,
             trigger: nil
         )
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
         UNUserNotificationCenter.current().add(request)
     }
 
@@ -192,11 +196,18 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
 
         // Pre-compute the app URL before terminating so we don't need to capture workspace.
         let appURL = workspace.urlForApplication(withBundleIdentifier: bundleID)
-        app.terminate()
+        let terminated = app.terminate()
+        if !terminated {
+            NSLog("AnomalyDetector: terminate() returned false for %@ (%@)", appName, bundleID)
+        }
 
         DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
             guard let url = appURL else { return }
-            NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+            NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration()) { _, error in
+                if let error = error {
+                    NSLog("AnomalyDetector: failed to relaunch %@ (%@): %@", appName, bundleID, error.localizedDescription)
+                }
+            }
         }
     }
 }

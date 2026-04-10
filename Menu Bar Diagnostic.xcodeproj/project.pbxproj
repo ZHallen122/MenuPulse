@@ -25,6 +25,13 @@
 		AA000000000000000000005E /* DataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000005D /* DataStore.swift */; };
 		AA0000000000000000000060 /* MemoryPressure.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000005F /* MemoryPressure.swift */; };
 		AA0000000000000000000062 /* AnomalyDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000061 /* AnomalyDetector.swift */; };
+		BB000000000000000000000A /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000009 /* XCTest.framework */; };
+		BB000000000000000000000C /* MenuBarDiagnosticTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000000B /* MenuBarDiagnosticTests.swift */; };
+		CC0000000000000000000001 /* AnomalyDetector.swift in TestSources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000061 /* AnomalyDetector.swift */; };
+		CC0000000000000000000002 /* DataStore.swift in TestSources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000005D /* DataStore.swift */; };
+		CC0000000000000000000003 /* MenuBarProcess.swift in TestSources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000020 /* MenuBarProcess.swift */; };
+		CC0000000000000000000004 /* MemoryPressure.swift in TestSources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000005F /* MemoryPressure.swift */; };
+		CC0000000000000000000005 /* PreferencesManager.swift in TestSources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000040 /* PreferencesManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -48,6 +55,9 @@
 		AA000000000000000000005D /* DataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataStore.swift; sourceTree = "<group>"; };
 		AA000000000000000000005F /* MemoryPressure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryPressure.swift; sourceTree = "<group>"; };
 		AA0000000000000000000061 /* AnomalyDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnomalyDetector.swift; sourceTree = "<group>"; };
+		BB0000000000000000000001 /* MenuBarDiagnosticTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MenuBarDiagnosticTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		BB0000000000000000000009 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
+		BB000000000000000000000B /* MenuBarDiagnosticTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarDiagnosticTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -58,6 +68,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BB0000000000000000000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BB000000000000000000000A /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -65,6 +83,7 @@
 			isa = PBXGroup;
 			children = (
 				AA000000000000000000000B /* MenuBarDiagnostic */,
+				BB000000000000000000000D /* MenuBarDiagnosticTests */,
 				AA000000000000000000000A /* Products */,
 			);
 			sourceTree = "<group>";
@@ -73,6 +92,7 @@
 			isa = PBXGroup;
 			children = (
 				AA000000000000000000000C /* Menu Bar Diagnostic.app */,
+				BB0000000000000000000001 /* MenuBarDiagnosticTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -103,6 +123,14 @@
 			path = MenuBarDiagnostic;
 			sourceTree = "<group>";
 		};
+		BB000000000000000000000D /* MenuBarDiagnosticTests */ = {
+			isa = PBXGroup;
+			children = (
+				BB000000000000000000000B /* MenuBarDiagnosticTests.swift */,
+			);
+			path = MenuBarDiagnosticTests;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -123,6 +151,23 @@
 			productReference = AA000000000000000000000C /* Menu Bar Diagnostic.app */;
 			productType = "com.apple.product-type.application";
 		};
+		BB0000000000000000000002 /* MenuBarDiagnosticTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BB0000000000000000000006 /* Build configuration list for PBXNativeTarget "MenuBarDiagnosticTests" */;
+			buildPhases = (
+				BB0000000000000000000003 /* Sources */,
+				BB0000000000000000000004 /* Frameworks */,
+				BB0000000000000000000005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MenuBarDiagnosticTests;
+			productName = MenuBarDiagnosticTests;
+			productReference = BB0000000000000000000001 /* MenuBarDiagnosticTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -134,6 +179,9 @@
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
 					AA0000000000000000000002 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					BB0000000000000000000002 = {
 						CreatedOnToolsVersion = 16.0;
 					};
 				};
@@ -152,12 +200,20 @@
 			projectRoot = "";
 			targets = (
 				AA0000000000000000000002 /* Menu Bar Diagnostic */,
+				BB0000000000000000000002 /* MenuBarDiagnosticTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		AA0000000000000000000016 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BB0000000000000000000005 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -189,6 +245,19 @@
 				AA000000000000000000005E /* DataStore.swift in Sources */,
 				AA0000000000000000000060 /* MemoryPressure.swift in Sources */,
 				AA0000000000000000000062 /* AnomalyDetector.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BB0000000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BB000000000000000000000C /* MenuBarDiagnosticTests.swift in Sources */,
+				CC0000000000000000000001 /* AnomalyDetector.swift in TestSources */,
+				CC0000000000000000000002 /* DataStore.swift in TestSources */,
+				CC0000000000000000000003 /* MenuBarProcess.swift in TestSources */,
+				CC0000000000000000000004 /* MemoryPressure.swift in TestSources */,
+				CC0000000000000000000005 /* PreferencesManager.swift in TestSources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -364,6 +433,38 @@
 			};
 			name = Release;
 		};
+		BB0000000000000000000007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.allenz.MenuBarDiagnosticTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		BB0000000000000000000008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.allenz.MenuBarDiagnosticTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -381,6 +482,15 @@
 			buildConfigurations = (
 				AA0000000000000000000007 /* Debug */,
 				AA0000000000000000000008 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BB0000000000000000000006 /* Build configuration list for PBXNativeTarget "MenuBarDiagnosticTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BB0000000000000000000007 /* Debug */,
+				BB0000000000000000000008 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

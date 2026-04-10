@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import Combine
 import UserNotifications
+import ServiceManagement
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
@@ -17,7 +18,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "stethoscope", accessibilityDescription: "Menu Bar Diagnostic")
+            button.image = NSImage(systemSymbolName: "stethoscope", accessibilityDescription: "Bouncer")
             button.imagePosition = .imageLeft
             button.action = #selector(handleStatusBarClick(_:))
             button.target = self
@@ -28,11 +29,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupNotifications()
         monitor.startMonitoring()
 
-        // Update badge with process count after each sample
+        // No badge — icon color conveys status
         monitor.$processes
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] processes in
-                self?.statusItem?.button?.title = processes.isEmpty ? "" : "\(processes.count)"
+            .sink { [weak self] _ in
+                self?.statusItem?.button?.title = ""
+            }
+            .store(in: &cancellables)
+
+        // Launch at login — apply stored value on launch, then observe UserDefaults changes
+        applyLaunchAtLogin(prefs.launchAtLogin)
+        NotificationCenter.default
+            .publisher(for: UserDefaults.didChangeNotification)
+            .map { _ in UserDefaults.standard.bool(forKey: "launchAtLogin") }
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                self?.applyLaunchAtLogin(enabled)
             }
             .store(in: &cancellables)
 
@@ -59,7 +72,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let center = UNUserNotificationCenter.current()
 
         // Request permission to show alerts and play sounds.
-        center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+            if let error = error {
+                NSLog("Bouncer: notification authorization error: %@", error.localizedDescription)
+            } else if !granted {
+                NSLog("Bouncer: notification permission denied by user")
+            }
+        }
 
         // Register the "MEMORY_ANOMALY" category with Restart Now and Ignore actions.
         let restartAction = UNNotificationAction(
@@ -109,6 +128,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
+        }
+    }
+
+    private func applyLaunchAtLogin(_ enabled: Bool) {
+        do {
+            if enabled {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+        } catch {
+            NSLog("SMAppService error: %@", error.localizedDescription)
         }
     }
 

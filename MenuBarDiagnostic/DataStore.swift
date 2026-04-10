@@ -17,6 +17,18 @@ final class DataStore {
         }
     }
 
+    /// Opens a SQLite database at an explicit path. Pass `":memory:"` for an
+    /// in-memory database suitable for unit tests.
+    init(path: String) {
+        queue.async { [weak self] in
+            var dbPtr: OpaquePointer?
+            if sqlite3_open(path, &dbPtr) == SQLITE_OK {
+                self?.db = dbPtr
+            }
+            self?.createTablesIfNeeded()
+        }
+    }
+
     deinit {
         if let db = db { sqlite3_close(db) }
     }
@@ -97,8 +109,12 @@ final class DataStore {
                 PRIMARY KEY (bundle_id, date)
             );
             """
-        sqlite3_exec(db, memorySamples, nil, nil, nil)
-        sqlite3_exec(db, dailyBaselines, nil, nil, nil)
+        if sqlite3_exec(db, memorySamples, nil, nil, nil) != SQLITE_OK {
+            NSLog("DataStore: failed to create memory_samples table: %@", String(cString: sqlite3_errmsg(db)))
+        }
+        if sqlite3_exec(db, dailyBaselines, nil, nil, nil) != SQLITE_OK {
+            NSLog("DataStore: failed to create daily_baselines table: %@", String(cString: sqlite3_errmsg(db)))
+        }
     }
 
     private func insertSamples(_ processes: [MenuBarProcess]) {
@@ -117,7 +133,10 @@ final class DataStore {
             sqlite3_bind_text(stmt, 3, (process.name as NSString).utf8String, -1, nil)
             sqlite3_bind_double(stmt, 4, memMB)
             sqlite3_bind_int64(stmt, 5, now)
-            sqlite3_step(stmt)
+            let rc = sqlite3_step(stmt)
+            if rc != SQLITE_DONE && rc != SQLITE_ROW {
+                NSLog("DataStore: insertSamples sqlite3_step failed (%d): %@", rc, String(cString: sqlite3_errmsg(db)))
+            }
             sqlite3_reset(stmt)
         }
     }
@@ -130,7 +149,10 @@ final class DataStore {
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
         defer { sqlite3_finalize(stmt) }
         sqlite3_bind_int64(stmt, 1, cutoff)
-        sqlite3_step(stmt)
+        let rc = sqlite3_step(stmt)
+        if rc != SQLITE_DONE && rc != SQLITE_ROW {
+            NSLog("DataStore: deleteStaleSamples sqlite3_step failed (%d): %@", rc, String(cString: sqlite3_errmsg(db)))
+        }
     }
 
     private func rebuildBaselines() {
@@ -154,19 +176,26 @@ final class DataStore {
         var groups: [(bundleID: String, date: String, values: [Double])] = []
         var current: (bundleID: String, date: String, values: [Double])?
 
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            let bundleID = String(cString: sqlite3_column_text(stmt, 0))
-            let date     = String(cString: sqlite3_column_text(stmt, 1))
-            let memMB    = sqlite3_column_double(stmt, 2)
-            if var c = current, c.bundleID == bundleID, c.date == date {
-                c.values.append(memMB)
-                current = c
-            } else {
-                if let c = current {
-                    groups.append((bundleID: c.bundleID, date: c.date, values: c.values))
+        var frc: Int32
+        repeat {
+            frc = sqlite3_step(stmt)
+            if frc == SQLITE_ROW {
+                let bundleID = String(cString: sqlite3_column_text(stmt, 0))
+                let date     = String(cString: sqlite3_column_text(stmt, 1))
+                let memMB    = sqlite3_column_double(stmt, 2)
+                if var c = current, c.bundleID == bundleID, c.date == date {
+                    c.values.append(memMB)
+                    current = c
+                } else {
+                    if let c = current {
+                        groups.append((bundleID: c.bundleID, date: c.date, values: c.values))
+                    }
+                    current = (bundleID, date, [memMB])
                 }
-                current = (bundleID, date, [memMB])
             }
+        } while frc == SQLITE_ROW
+        if frc != SQLITE_DONE {
+            NSLog("DataStore: rebuildBaselines fetch failed (%d): %@", frc, String(cString: sqlite3_errmsg(db)))
         }
         if let c = current {
             groups.append((bundleID: c.bundleID, date: c.date, values: c.values))
@@ -187,7 +216,10 @@ final class DataStore {
             sqlite3_bind_text(uStmt, 2, (group.date as NSString).utf8String, -1, nil)
             sqlite3_bind_double(uStmt, 3, avg)
             sqlite3_bind_double(uStmt, 4, p90)
-            sqlite3_step(uStmt)
+            let urc = sqlite3_step(uStmt)
+            if urc != SQLITE_DONE && urc != SQLITE_ROW {
+                NSLog("DataStore: rebuildBaselines upsert failed (%d): %@", urc, String(cString: sqlite3_errmsg(db)))
+            }
             sqlite3_reset(uStmt)
         }
     }
