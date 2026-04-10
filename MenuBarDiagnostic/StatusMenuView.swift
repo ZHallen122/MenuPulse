@@ -5,7 +5,7 @@ struct StatusMenuView: View {
     @ObservedObject var monitor: ProcessMonitor
     @ObservedObject var prefs: PreferencesManager
     @ObservedObject var anomalyDetector: AnomalyDetector
-    @State private var showSettings = false
+    var onSettingsTap: () -> Void
     @State private var expandedPID: pid_t? = nil
 
     var body: some View {
@@ -18,9 +18,6 @@ struct StatusMenuView: View {
             footerBar
         }
         .frame(width: 300)
-        .sheet(isPresented: $showSettings) {
-            SettingsView(prefs: prefs)
-        }
     }
 
     // MARK: - Summary Header
@@ -139,7 +136,7 @@ struct StatusMenuView: View {
                 .foregroundColor(.secondary)
                 .font(.caption)
             Spacer()
-            Button("Settings") { showSettings = true }
+            Button("Settings") { onSettingsTap() }
                 .buttonStyle(.plain)
                 .foregroundColor(.secondary)
                 .font(.caption)
@@ -294,5 +291,5 @@ private struct ProcessRowView: View {
     let prefs = PreferencesManager()
     let monitor = ProcessMonitor(prefs: prefs)
     let detector = AnomalyDetector(dataStore: monitor.dataStore, prefs: prefs)
-    return StatusMenuView(monitor: monitor, prefs: prefs, anomalyDetector: detector)
+    return StatusMenuView(monitor: monitor, prefs: prefs, anomalyDetector: detector, onSettingsTap: {})
 }
