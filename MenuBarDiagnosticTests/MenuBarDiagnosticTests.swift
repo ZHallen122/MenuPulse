@@ -2,6 +2,16 @@ import XCTest
 
 final class MenuBarDiagnosticTests: XCTestCase {
 
+    // MARK: - Lifecycle
+
+    override func setUp() {
+        super.setUp()
+        // Place app outside the 3-day learning period by default so tests that
+        // exercise anomaly detection are not silently suppressed. Tests that
+        // specifically need the learning period active override this locally.
+        UserDefaults.standard.set(Date().addingTimeInterval(-7 * 86400), forKey: "firstLaunchDate")
+    }
+
     // MARK: - Helpers
 
     private func makeProcess(bundleID: String, memoryMB: Double, pid: Int32 = 1234) -> MenuBarProcess {
@@ -282,5 +292,152 @@ final class MenuBarDiagnosticTests: XCTestCase {
         )
         // The process is still flagged in the view layer regardless of cooldown
         XCTAssertTrue(detector.anomalousBundleIDs.contains(bundleID))
+    }
+
+    // MARK: - AnomalyDetector: learning period suppresses anomalies
+
+    func testLearningPeriodSuppressesAnomalies() {
+        // Simulate a just-launched app (learning period active)
+        UserDefaults.standard.set(Date(), forKey: "firstLaunchDate")
+
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let bundleID = "com.test.Learning"
+        let baseProcs = (1...10).map { i in
+            makeProcess(bundleID: bundleID, memoryMB: 50, pid: Int32(i))
+        }
+        store.persistSamples(baseProcs)
+        Thread.sleep(forTimeInterval: 0.1)
+        store.recomputeBaselines()
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let detector = AnomalyDetector(dataStore: store, prefs: PreferencesManager())
+        // Pre-seed as if anomaly started 11 minutes ago
+        detector.anomalyStartDates[bundleID] = Date().addingTimeInterval(-11 * 60)
+
+        detector.evaluate(processes: [makeProcess(bundleID: bundleID, memoryMB: 300)],
+                          pressure: .warning)
+
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        XCTAssertTrue(detector.anomalousBundleIDs.isEmpty,
+                      "learning period must suppress all anomaly detection")
+        XCTAssertTrue(detector.anomalyStartDates.isEmpty,
+                      "evaluate() must clear anomalyStartDates during learning period")
+    }
+
+    // MARK: - AnomalyDetector: ignored bundle IDs are excluded
+
+    func testIgnoredBundleIDIsNotFlagged() {
+        // Not in learning period
+        UserDefaults.standard.set(Date().addingTimeInterval(-7 * 86400), forKey: "firstLaunchDate")
+
+        let bundleID = "com.test.Ignored"
+        let prefs = PreferencesManager()
+        prefs.ignoredBundleIDsRaw = bundleID
+
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let baseProcs = (1...10).map { i in
+            makeProcess(bundleID: bundleID, memoryMB: 50, pid: Int32(i))
+        }
+        store.persistSamples(baseProcs)
+        Thread.sleep(forTimeInterval: 0.1)
+        store.recomputeBaselines()
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let detector = AnomalyDetector(dataStore: store, prefs: prefs)
+        detector.anomalyStartDates[bundleID] = Date().addingTimeInterval(-11 * 60)
+
+        detector.evaluate(processes: [makeProcess(bundleID: bundleID, memoryMB: 300)],
+                          pressure: .warning)
+
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        XCTAssertFalse(detector.anomalousBundleIDs.contains(bundleID),
+                       "ignored bundle ID must never be flagged as anomalous")
+    }
+
+    // MARK: - AnomalyDetector: departed process clears anomalyStartDate
+
+    func testDepartedProcessClearsAnomalyStartDate() {
+        // Not in learning period
+        UserDefaults.standard.set(Date().addingTimeInterval(-7 * 86400), forKey: "firstLaunchDate")
+
+        // DataStore with no baseline for "com.test.Other"
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let detector = AnomalyDetector(dataStore: store, prefs: PreferencesManager())
+        // Pre-seed departed process
+        detector.anomalyStartDates["com.test.Departed"] = Date()
+
+        // Evaluate with a different process that has no baseline — it enters liveBundleIDs
+        // but skips anomaly logic. The cleanup loop then removes "com.test.Departed".
+        detector.evaluate(processes: [makeProcess(bundleID: "com.test.Other", memoryMB: 100)],
+                          pressure: .warning)
+
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        XCTAssertNil(detector.anomalyStartDates["com.test.Departed"],
+                     "anomalyStartDate must be cleared for a process no longer in the process list")
+    }
+
+    // MARK: - AnomalyDetector: conservative sensitivity raises threshold
+
+    func testConservativeSensitivityRequiresHigherThreshold() {
+        UserDefaults.standard.set("conservative", forKey: "sensitivity")
+        defer { UserDefaults.standard.removeObject(forKey: "sensitivity") }
+
+        // Not in learning period
+        UserDefaults.standard.set(Date().addingTimeInterval(-7 * 86400), forKey: "firstLaunchDate")
+
+        let bundleID = "com.test.Conservative"
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        // Baseline p90 = 100 MB → conservative threshold = 100 × 4.0 = 400 MB
+        let baseProcs = (1...10).map { i in
+            makeProcess(bundleID: bundleID, memoryMB: 100, pid: Int32(i))
+        }
+        store.persistSamples(baseProcs)
+        Thread.sleep(forTimeInterval: 0.1)
+        store.recomputeBaselines()
+        Thread.sleep(forTimeInterval: 0.1)
+
+        // Two trend samples 1 second apart → positive slope
+        store.persistSamples([makeProcess(bundleID: bundleID, memoryMB: 100, pid: 500)])
+        Thread.sleep(forTimeInterval: 1.1)
+        store.persistSamples([makeProcess(bundleID: bundleID, memoryMB: 200, pid: 501)])
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let detector = AnomalyDetector(dataStore: store, prefs: PreferencesManager())
+        detector.anomalyStartDates[bundleID] = Date().addingTimeInterval(-11 * 60)
+
+        // 350 MB is above default threshold (100 × 2.5 = 250 MB) but below conservative (400 MB)
+        detector.evaluate(processes: [makeProcess(bundleID: bundleID, memoryMB: 350)],
+                          pressure: .warning)
+
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        XCTAssertFalse(detector.anomalousBundleIDs.contains(bundleID),
+                       "350 MB must not trigger conservative threshold of 400 MB (p90 × 4.0)")
+    }
+
+    // MARK: - DataStore: nil baseline for unknown bundle ID
+
+    func testBaselineNilForUnknownBundleID() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let baseline = store.baseline(for: "com.test.NeverSeen")
+        XCTAssertNil(baseline, "baseline must be nil when no samples have been persisted for the bundle ID")
+    }
+
+    // MARK: - PreferencesManager: ignoredBundleIDs parsing trims whitespace
+
+    func testIgnoredBundleIDsParsingTrimsWhitespace() {
+        let prefs = PreferencesManager()
+        prefs.ignoredBundleIDsRaw = " com.a , com.b , , com.c "
+        XCTAssertEqual(prefs.ignoredBundleIDs, ["com.a", "com.b", "com.c"],
+                       "ignoredBundleIDs must split on comma, trim whitespace, and drop empty entries")
     }
 }
