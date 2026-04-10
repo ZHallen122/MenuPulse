@@ -228,6 +228,12 @@ private struct ProcessRowView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
             HStack(spacing: 8) {
+                Button("Quit App") {
+                    quitApp()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .tint(.red)
                 Button("Restart App") {
                     restartApp()
                 }
@@ -272,6 +278,13 @@ private struct ProcessRowView: View {
         let denominator = n * sumX2 - sumX * sumX
         guard denominator != 0 else { return 0 }
         return (n * sumXY - sumX * sumY) / denominator
+    }
+
+    private func quitApp() {
+        guard let bundleID = process.bundleIdentifier else { return }
+        let workspace = NSWorkspace.shared
+        guard let app = workspace.runningApplications.first(where: { $0.bundleIdentifier == bundleID }) else { return }
+        app.terminate()
     }
 
     private func restartApp() {
