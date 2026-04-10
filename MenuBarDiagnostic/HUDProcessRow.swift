@@ -11,7 +11,7 @@ struct HUDProcessRow: View {
 
     private var isHogging: Bool {
         process.cpuFraction > cpuAlertThreshold ||
-        process.residentMemoryBytes > UInt64(ramAlertThresholdMB * 1024 * 1024)
+        process.memoryFootprintBytes > UInt64(ramAlertThresholdMB * 1024 * 1024)
     }
 
     var body: some View {
@@ -39,7 +39,7 @@ struct HUDProcessRow: View {
                 .animation(.easeInOut(duration: 0.35), value: process.cpuHistory)
 
             // RAM bar
-            RAMBarView(bytes: process.residentMemoryBytes, maxBytes: 500 * 1024 * 1024)
+            RAMBarView(bytes: process.memoryFootprintBytes, maxBytes: 500 * 1024 * 1024)
                 .frame(height: 4)
 
             // RAM label

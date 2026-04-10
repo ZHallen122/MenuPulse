@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SparklineView: View {
     let values: [Double]
+    var color: Color = .blue
 
     var body: some View {
         GeometryReader { geo in
@@ -11,13 +12,13 @@ struct SparklineView: View {
                     fillPath(in: geo.size)
                         .fill(
                             LinearGradient(
-                                gradient: Gradient(colors: [Color.blue.opacity(0.25), Color.blue.opacity(0.0)]),
+                                gradient: Gradient(colors: [color.opacity(0.25), color.opacity(0.0)]),
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
                         )
                     linePath(in: geo.size)
-                        .stroke(Color.blue.opacity(0.85), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+                        .stroke(color.opacity(0.85), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
                 } else {
                     Rectangle()
                         .fill(Color.secondary.opacity(0.08))

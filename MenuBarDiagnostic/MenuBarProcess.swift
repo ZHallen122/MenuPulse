@@ -45,10 +45,14 @@ struct MenuBarProcess: Identifiable {
     /// Used by `SparklineView` to render a CPU trend chart.
     let cpuHistory: [Double]
 
-    /// Resident set size in bytes, as reported by `proc_taskinfo.pti_resident_size`.
-    /// This is the amount of physical RAM currently mapped and resident for
-    /// the process (not virtual memory).
-    let residentMemoryBytes: UInt64
+    /// Rolling buffer of the last 20 memory footprint samples in MB (oldest first).
+    /// Each value = memoryFootprintBytes / 1_048_576.0 at sample time.
+    let memoryHistory: [Double]
+
+    /// Physical memory footprint in bytes, as reported by `proc_pid_rusage` /
+    /// `rusage_info_v4.ri_phys_footprint`. This matches the "Memory" column in
+    /// Activity Monitor and reflects the true physical cost of the process.
+    let memoryFootprintBytes: UInt64
 
     /// System thermal state at the moment this snapshot was captured.
     ///
@@ -84,7 +88,7 @@ struct MenuBarProcess: Identifiable {
     /// Values below 1 000 MB are shown as `"NNN MB"`; at or above that
     /// threshold they are shown as `"N.NN GB"`.
     var memoryString: String {
-        let mb = Double(residentMemoryBytes) / 1_048_576
+        let mb = Double(memoryFootprintBytes) / 1_048_576
         if mb < 1_000 {
             return String(format: "%.0f MB", mb)
         } else {

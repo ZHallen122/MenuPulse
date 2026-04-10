@@ -22,6 +22,9 @@
 		AA0000000000000000000058 /* ProcessDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000057 /* ProcessDetailSheet.swift */; };
 		AA000000000000000000005A /* HUDProcessRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000059 /* HUDProcessRow.swift */; };
 		AA000000000000000000005C /* ThermalState+Display.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000005B /* ThermalState+Display.swift */; };
+		AA000000000000000000005E /* DataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000005D /* DataStore.swift */; };
+		AA0000000000000000000060 /* MemoryPressure.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000005F /* MemoryPressure.swift */; };
+		AA0000000000000000000062 /* AnomalyDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000061 /* AnomalyDetector.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,6 +45,9 @@
 		AA0000000000000000000057 /* ProcessDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessDetailSheet.swift; sourceTree = "<group>"; };
 		AA0000000000000000000059 /* HUDProcessRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDProcessRow.swift; sourceTree = "<group>"; };
 		AA000000000000000000005B /* ThermalState+Display.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ThermalState+Display.swift"; sourceTree = "<group>"; };
+		AA000000000000000000005D /* DataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataStore.swift; sourceTree = "<group>"; };
+		AA000000000000000000005F /* MemoryPressure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryPressure.swift; sourceTree = "<group>"; };
+		AA0000000000000000000061 /* AnomalyDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnomalyDetector.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -89,6 +95,9 @@
 				AA0000000000000000000057 /* ProcessDetailSheet.swift */,
 				AA0000000000000000000059 /* HUDProcessRow.swift */,
 				AA000000000000000000005B /* ThermalState+Display.swift */,
+				AA000000000000000000005D /* DataStore.swift */,
+				AA000000000000000000005F /* MemoryPressure.swift */,
+				AA0000000000000000000061 /* AnomalyDetector.swift */,
 				AA0000000000000000000010 /* Info.plist */,
 			);
 			path = MenuBarDiagnostic;
@@ -177,6 +186,9 @@
 				AA0000000000000000000058 /* ProcessDetailSheet.swift in Sources */,
 				AA000000000000000000005A /* HUDProcessRow.swift in Sources */,
 				AA000000000000000000005C /* ThermalState+Display.swift in Sources */,
+				AA000000000000000000005E /* DataStore.swift in Sources */,
+				AA0000000000000000000060 /* MemoryPressure.swift in Sources */,
+				AA0000000000000000000062 /* AnomalyDetector.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

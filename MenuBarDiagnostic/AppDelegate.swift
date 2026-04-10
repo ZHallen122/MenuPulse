@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import Combine
+import UserNotifications
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
@@ -10,6 +11,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     let prefs = PreferencesManager()
     lazy var monitor: ProcessMonitor = ProcessMonitor(prefs: prefs)
+    lazy var anomalyDetector: AnomalyDetector = AnomalyDetector(dataStore: monitor.dataStore, prefs: prefs)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -23,6 +25,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         setupPopover()
+        setupNotifications()
         monitor.startMonitoring()
 
         // Update badge with process count after each sample
@@ -32,17 +35,60 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.statusItem?.button?.title = processes.isEmpty ? "" : "\(processes.count)"
             }
             .store(in: &cancellables)
+
+        // Update icon tint color to reflect system memory pressure.
+        monitor.$memoryPressure
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] pressure in
+                let color: NSColor
+                switch pressure {
+                case .normal:   color = .systemGreen
+                case .warning:  color = .systemOrange
+                case .critical: color = .systemRed
+                }
+                self?.statusItem?.button?.contentTintColor = color
+            }
+            .store(in: &cancellables)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         monitor.stopMonitoring()
     }
 
+    private func setupNotifications() {
+        let center = UNUserNotificationCenter.current()
+
+        // Request permission to show alerts and play sounds.
+        center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
+
+        // Register the "MEMORY_ANOMALY" category with Restart Now and Ignore actions.
+        let restartAction = UNNotificationAction(
+            identifier: "RESTART_NOW",
+            title: "Restart Now",
+            options: .foreground
+        )
+        let ignoreAction = UNNotificationAction(
+            identifier: "IGNORE",
+            title: "Ignore",
+            options: []
+        )
+        let category = UNNotificationCategory(
+            identifier: "MEMORY_ANOMALY",
+            actions: [restartAction, ignoreAction],
+            intentIdentifiers: [],
+            options: []
+        )
+        center.setNotificationCategories([category])
+
+        // Wire the shared anomaly detector into the process monitor.
+        monitor.anomalyDetector = anomalyDetector
+    }
+
     private func setupPopover() {
-        let vc = NSHostingController(rootView: StatusMenuView(monitor: monitor, prefs: prefs))
+        let vc = NSHostingController(rootView: StatusMenuView(monitor: monitor, prefs: prefs, anomalyDetector: anomalyDetector))
         let pop = NSPopover()
         pop.contentViewController = vc
-        pop.contentSize = NSSize(width: 320, height: 400)
+        pop.contentSize = NSSize(width: 300, height: 400)
         pop.behavior = .transient
         self.popover = pop
     }
