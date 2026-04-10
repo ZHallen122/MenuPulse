@@ -149,7 +149,7 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
 
     private func sendNotification(bundleID: String, appName: String, currentMB: Double, ratio: Double) {
         let content = UNMutableNotificationContent()
-        content.title = "\(appName) memory abnormal"
+        content.title = "\(appName) is using too much memory"
         if currentMB >= 1000 {
             let gb = currentMB / 1024.0
             content.body = String(format: "Using %.1f GB — %.1fx its normal level. System memory pressure is elevated.", gb, ratio)
@@ -183,8 +183,12 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
         switch response.actionIdentifier {
         case "RESTART_NOW":
             restartApp(bundleID: bundleID, appName: appName)
+        case "IGNORE":
+            if !bundleID.isEmpty && !prefs.ignoredBundleIDs.contains(bundleID) {
+                prefs.ignoredBundleIDs.append(bundleID)
+            }
         default:
-            break // IGNORE or default dismissal — do nothing
+            break // default dismissal — do nothing
         }
         completionHandler()
     }
