@@ -158,7 +158,11 @@ class ProcessMonitor: ObservableObject {
                     proc_pid_rusage(pid, RUSAGE_INFO_V4, reboundPtr)
                 }
             }
-            let memFootprint: UInt64 = (rusageRet == 0) ? rusageInfo.ri_phys_footprint : 0
+            guard rusageRet == 0 else {
+                NSLog("ProcessMonitor: proc_pid_rusage failed for pid %d (rc=%d); skipping sample", pid, rusageRet)
+                continue
+            }
+            let memFootprint: UInt64 = rusageInfo.ri_phys_footprint
 
             // Maintain a rolling window of the last 20 memory footprint samples (in MB).
             var memHistory = memoryHistories[pid] ?? []

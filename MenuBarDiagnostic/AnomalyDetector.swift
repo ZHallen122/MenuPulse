@@ -166,7 +166,11 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
             trigger: nil
         )
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
-        UNUserNotificationCenter.current().add(request)
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                NSLog("AnomalyDetector: failed to schedule notification for %@: %@", bundleID, error.localizedDescription)
+            }
+        }
     }
 
     // MARK: - UNUserNotificationCenterDelegate
@@ -210,8 +214,9 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
         // Pre-compute the app URL before terminating so we don't need to capture workspace.
         let appURL = workspace.urlForApplication(withBundleIdentifier: bundleID)
         let terminated = app.terminate()
-        if !terminated {
-            NSLog("AnomalyDetector: terminate() returned false for %@ (%@)", appName, bundleID)
+        guard terminated else {
+            NSLog("AnomalyDetector: terminate() returned false for %@ (%@); skipping relaunch", appName, bundleID)
+            return
         }
 
         DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
