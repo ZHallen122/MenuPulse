@@ -78,7 +78,7 @@ struct StatusMenuView: View {
                 guard let bid = p.bundleIdentifier else { return true }
                 return !anomalyDetector.anomalousBundleIDs.contains(bid)
             }
-            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            .sorted { $0.memoryFootprintBytes > $1.memoryFootprintBytes }
     }
 
     @ViewBuilder
