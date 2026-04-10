@@ -1,9 +1,9 @@
 import AppKit
 import Darwin
 
-/// Sampling engine that periodically queries every running menu-bar process
-/// (activation policy `.accessory`) and publishes per-process and system-wide
-/// CPU/RAM metrics.
+/// Sampling engine that periodically queries all user-visible processes
+/// (regular and accessory; excludes background-only daemons with `.prohibited` policy)
+/// and publishes per-process and system-wide CPU/RAM metrics.
 ///
 /// Sampling is driven by a repeating `Timer` whose interval is read from
 /// `PreferencesManager.refreshInterval`. All published updates are dispatched
@@ -104,6 +104,8 @@ class ProcessMonitor: ObservableObject {
         let thermalState = ProcessInfo.processInfo.thermalState
         let wallNow = DispatchTime.now().uptimeNanoseconds
 
+        // Include all user-visible processes (regular and accessory; excludes
+        // background-only daemons with `.prohibited` policy).
         let accessoryApps = NSWorkspace.shared.runningApplications.filter {
             $0.activationPolicy != .prohibited
         }

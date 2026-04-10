@@ -114,7 +114,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             monitor: monitor,
             prefs: prefs,
             anomalyDetector: anomalyDetector,
-            onSettingsTap: { [weak self] in self?.openSettings() }
+            onSettingsTap: { [weak self] in self?.openSettings() },
+            onClosePopover: { [weak self] in self?.popover?.performClose(nil) }
         ))
         let pop = NSPopover()
         pop.contentViewController = vc
@@ -142,6 +143,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // NSHostingController sizes the window to fit SwiftUI content automatically.
         win.center()
         settingsWindow = win
+        NotificationCenter.default
+            .publisher(for: NSWindow.willCloseNotification, object: win)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.settingsWindow = nil }
+            .store(in: &cancellables)
         win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }

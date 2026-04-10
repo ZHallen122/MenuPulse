@@ -53,6 +53,21 @@ class PreferencesManager: ObservableObject {
     /// Bundle IDs to exclude from scanning, stored as a comma-joined string.
     @AppStorage("ignoredBundleIDsRaw") var ignoredBundleIDsRaw: String = ""
 
+    /// Date the app was first launched, persisted in UserDefaults.
+    /// Uses UserDefaults.standard directly (not @AppStorage) so it is readable
+    /// from non-SwiftUI code (e.g. AnomalyDetector).
+    var firstLaunchDate: Date {
+        if let d = UserDefaults.standard.object(forKey: "firstLaunchDate") as? Date { return d }
+        let now = Date()
+        UserDefaults.standard.set(now, forKey: "firstLaunchDate")
+        return now
+    }
+
+    /// True during the 3-day baseline learning period after first launch.
+    var isInLearningPeriod: Bool {
+        Date().timeIntervalSince(firstLaunchDate) < 3 * 86400
+    }
+
     /// Parsed list of ignored bundle identifiers.
     var ignoredBundleIDs: [String] {
         get {
