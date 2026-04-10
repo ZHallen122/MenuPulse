@@ -440,4 +440,155 @@ final class MenuBarDiagnosticTests: XCTestCase {
         XCTAssertEqual(prefs.ignoredBundleIDs, ["com.a", "com.b", "com.c"],
                        "ignoredBundleIDs must split on comma, trim whitespace, and drop empty entries")
     }
+
+    // MARK: - PreferencesManager: ignoredBundleIDs setter joins with comma
+
+    func testIgnoredBundleIDsSetterJoinsWithComma() {
+        let prefs = PreferencesManager()
+        prefs.ignoredBundleIDs = ["com.a", "com.b"]
+        XCTAssertEqual(prefs.ignoredBundleIDsRaw, "com.a,com.b",
+                       "ignoredBundleIDs setter must join entries with comma into ignoredBundleIDsRaw")
+    }
+
+    // MARK: - AnomalyDetector: critical pressure triggers anomaly
+
+    func testCriticalPressureMarksAnomalous() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let bundleID = "com.test.Critical"
+        // Baseline p90 = 50 MB → default threshold 125 MB
+        let baseProcs = (1...10).map { i in
+            makeProcess(bundleID: bundleID, memoryMB: 50, pid: Int32(i))
+        }
+        store.persistSamples(baseProcs)
+        Thread.sleep(forTimeInterval: 0.1)
+        store.recomputeBaselines()
+        Thread.sleep(forTimeInterval: 0.1)
+
+        // Two trend samples 1 second apart → positive slope
+        store.persistSamples([makeProcess(bundleID: bundleID, memoryMB: 100, pid: 700)])
+        Thread.sleep(forTimeInterval: 1.1)
+        store.persistSamples([makeProcess(bundleID: bundleID, memoryMB: 200, pid: 701)])
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let detector = AnomalyDetector(dataStore: store, prefs: PreferencesManager())
+        detector.anomalyStartDates[bundleID] = Date().addingTimeInterval(-11 * 60)
+
+        // 300 MB > 125 MB ✓; positive slope ✓; pressure .critical ✓
+        detector.evaluate(processes: [makeProcess(bundleID: bundleID, memoryMB: 300)],
+                          pressure: .critical)
+
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        XCTAssertTrue(detector.anomalousBundleIDs.contains(bundleID),
+                      "critical memory pressure must also satisfy condition 3 and mark process anomalous")
+    }
+
+    // MARK: - AnomalyDetector: memory drops below threshold clears anomalyStartDate
+
+    func testMemoryDropBelowThresholdClearsAnomalyStartDate() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let bundleID = "com.test.Recovery"
+        // Baseline p90 = 100 MB → default threshold = 250 MB
+        let baseProcs = (1...10).map { i in
+            makeProcess(bundleID: bundleID, memoryMB: 100, pid: Int32(i))
+        }
+        store.persistSamples(baseProcs)
+        Thread.sleep(forTimeInterval: 0.1)
+        store.recomputeBaselines()
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let detector = AnomalyDetector(dataStore: store, prefs: PreferencesManager())
+        // Pre-seed anomalyStartDate as if it was already flagged
+        detector.anomalyStartDates[bundleID] = Date().addingTimeInterval(-11 * 60)
+
+        // 200 MB < 250 MB threshold → condition 1 fails → anomalyStartDate must be cleared
+        detector.evaluate(processes: [makeProcess(bundleID: bundleID, memoryMB: 200)],
+                          pressure: .warning)
+
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        XCTAssertNil(detector.anomalyStartDates[bundleID],
+                     "anomalyStartDate must be cleared when memory drops below threshold")
+    }
+
+    // MARK: - AnomalyDetector: nil bundleIdentifier process is skipped
+
+    func testNilBundleIdentifierProcessIsSkipped() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let detector = AnomalyDetector(dataStore: store, prefs: PreferencesManager())
+        let nilBundleProcess = MenuBarProcess(
+            pid: 9999,
+            name: "UnbundledApp",
+            bundleIdentifier: nil,
+            icon: nil,
+            cpuFraction: 0,
+            cpuHistory: [],
+            memoryHistory: [],
+            memoryFootprintBytes: UInt64(999 * 1_048_576),
+            thermalState: .nominal,
+            launchDate: nil
+        )
+
+        detector.evaluate(processes: [nilBundleProcess], pressure: .warning)
+
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        XCTAssertTrue(detector.anomalousBundleIDs.isEmpty,
+                      "process with nil bundleIdentifier must be skipped by anomaly detection")
+    }
+
+    // MARK: - AnomalyDetector: aggressive sensitivity lowers threshold
+
+    func testAggressiveSensitivityLowersThreshold() {
+        UserDefaults.standard.set("aggressive", forKey: "sensitivity")
+        defer { UserDefaults.standard.removeObject(forKey: "sensitivity") }
+
+        let bundleID = "com.test.Aggressive"
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        // Baseline p90 = 100 MB → aggressive threshold = 100 × 1.5 = 150 MB
+        let baseProcs = (1...10).map { i in
+            makeProcess(bundleID: bundleID, memoryMB: 100, pid: Int32(i))
+        }
+        store.persistSamples(baseProcs)
+        Thread.sleep(forTimeInterval: 0.1)
+        store.recomputeBaselines()
+        Thread.sleep(forTimeInterval: 0.1)
+
+        // Two trend samples 1 second apart → positive slope
+        store.persistSamples([makeProcess(bundleID: bundleID, memoryMB: 100, pid: 800)])
+        Thread.sleep(forTimeInterval: 1.1)
+        store.persistSamples([makeProcess(bundleID: bundleID, memoryMB: 150, pid: 801)])
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let detector = AnomalyDetector(dataStore: store, prefs: PreferencesManager())
+        detector.anomalyStartDates[bundleID] = Date().addingTimeInterval(-11 * 60)
+
+        // 160 MB > 150 MB threshold ✓; positive slope ✓; pressure .warning ✓
+        detector.evaluate(processes: [makeProcess(bundleID: bundleID, memoryMB: 160)],
+                          pressure: .warning)
+
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        XCTAssertTrue(detector.anomalousBundleIDs.contains(bundleID),
+                      "160 MB must trigger aggressive threshold of 150 MB (p90 × 1.5)")
+    }
+
+    // MARK: - DataStore: recentSamples respects since cutoff
+
+    func testRecentSamplesRespectsSinceCutoff() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        store.persistSamples([makeProcess(bundleID: "com.test.Since", memoryMB: 100)])
+        Thread.sleep(forTimeInterval: 0.1)
+
+        // Query with a cutoff 1 second after the insert — the sample was recorded before this
+        let samples = store.recentSamples(for: "com.test.Since", since: Date().addingTimeInterval(1))
+        XCTAssertTrue(samples.isEmpty,
+                      "recentSamples(since:) must exclude samples with timestamps before the cutoff")
+    }
 }
