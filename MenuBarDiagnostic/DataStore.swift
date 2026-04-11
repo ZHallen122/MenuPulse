@@ -83,7 +83,11 @@ final class DataStore {
         let fm = FileManager.default
         guard let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return }
         let dir = appSupport.appendingPathComponent("MenuBarDiagnostic", isDirectory: true)
-        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        do {
+            try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        } catch {
+            NSLog("DataStore: failed to create app support directory: %@", error.localizedDescription)
+        }
         let dbPath = dir.appendingPathComponent("diagnostics.sqlite3").path
         if sqlite3_open(dbPath, &db) != SQLITE_OK {
             NSLog("DataStore: sqlite3_open failed for path %@: %@", dbPath, String(cString: sqlite3_errmsg(db)))
