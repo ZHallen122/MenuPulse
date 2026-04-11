@@ -20,6 +20,7 @@ struct StatusMenuView: View {
             footerBar
         }
         .frame(width: 300)
+        .onDisappear { hoveredFooterButton = nil }
     }
 
     // MARK: - Summary Header

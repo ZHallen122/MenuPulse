@@ -188,8 +188,10 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
         case "RESTART_NOW":
             restartApp(bundleID: bundleID, appName: appName)
         case "IGNORE":
-            if !bundleID.isEmpty && !prefs.ignoredBundleIDs.contains(bundleID) {
-                prefs.ignoredBundleIDs.append(bundleID)
+            DispatchQueue.main.async {
+                if !bundleID.isEmpty && !self.prefs.ignoredBundleIDs.contains(bundleID) {
+                    self.prefs.ignoredBundleIDs.append(bundleID)
+                }
             }
         default:
             break // default dismissal — do nothing
