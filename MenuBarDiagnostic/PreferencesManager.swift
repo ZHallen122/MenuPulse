@@ -70,18 +70,27 @@ class PreferencesManager: ObservableObject {
         objectWillChange.send()
     }
 
-    /// How many hours remain in the learning period (0 if already past it).
-    var learningPeriodRemainingHours: Int {
-        let elapsed = Date().timeIntervalSince(firstLaunchDate)
-        let remaining = max(0, 3 * 86400 - elapsed)
-        return Int(remaining / 3600)
+    /// Human-readable time remaining in the learning period.
+    /// Shows seconds when in testing mode, hours otherwise.
+    func learningPeriodRemainingLabel(now: Date = Date()) -> String {
+        let elapsed = now.timeIntervalSince(firstLaunchDate)
+        let remaining = max(0, learningPeriodDuration - elapsed)
+        if testingMode {
+            return "\(Int(remaining)) s remaining"
+        }
+        return "\(Int(remaining / 3600)) h remaining"
     }
 
-    /// True during the 3-day baseline learning period after first launch.
-    /// Always returns false when testingMode is enabled.
+    /// Duration of the learning period.
+    /// 30 seconds in testing mode so the full learning → active transition
+    /// can be observed without waiting.
+    var learningPeriodDuration: TimeInterval {
+        testingMode ? 30 : 3 * 86400
+    }
+
+    /// True while still within the learning period window.
     var isInLearningPeriod: Bool {
-        guard !testingMode else { return false }
-        return Date().timeIntervalSince(firstLaunchDate) < 3 * 86400
+        Date().timeIntervalSince(firstLaunchDate) < learningPeriodDuration
     }
 
     /// When true, bypasses the learning period, memory pressure guard, and collapses
