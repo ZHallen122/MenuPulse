@@ -15,13 +15,13 @@ struct OnboardingView: View {
                 .font(.largeTitle)
                 .fontWeight(.bold)
 
-            Text("Bouncer watches your menu bar apps for memory leaks and swap spikes.")
+            Text("Bouncer quietly monitors your menu bar apps and alerts you when one starts using too much memory.")
                 .font(.body)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 320)
 
-            Button("Enable Notifications & Continue") {
+            Button("Allow Notifications & Get Started") {
                 UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in
                     DispatchQueue.main.async { onContinue() }
                 }
