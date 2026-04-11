@@ -22,7 +22,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
     private var hudWindow: HUDWindow?
-    private var settingsWindow: NSWindow?
     private var onboardingWindow: NSWindow?
     private var cancellables = Set<AnyCancellable>()
     private(set) var pendingAnomalyAlert = false
@@ -215,34 +214,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func openSettings() {
-        // Re-use an existing window if it's still open.
-        if let win = settingsWindow {
-            win.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
-            return
+        if #available(macOS 13.0, *) {
+            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        } else {
+            NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
         }
-        let vc = NSHostingController(rootView: SettingsView(
-            prefs: prefs,
-            anomalyDetector: anomalyDetector,
-            onCheckForUpdates: { [weak self] in self?.sparkleUpdater.checkForUpdates() }
-        ))
-        let win = NSWindow(contentViewController: vc)
-        win.title = "Bouncer Settings"
-        win.styleMask = [.titled, .closable, .resizable, .miniaturizable]
-        // Prevent NSWindow from releasing itself on close (fixes EXC_BAD_ACCESS on reopen).
-        // Swift ARC manages the lifetime via settingsWindow; the ObjC object must not
-        // self-release underneath it.
-        win.isReleasedWhenClosed = false
-        win.contentMinSize = NSSize(width: 400, height: 300)
-        // NSHostingController sizes the window to fit SwiftUI content automatically.
-        win.center()
-        settingsWindow = win
-        NotificationCenter.default
-            .publisher(for: NSWindow.willCloseNotification, object: win)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.settingsWindow = nil }
-            .store(in: &cancellables)
-        win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 

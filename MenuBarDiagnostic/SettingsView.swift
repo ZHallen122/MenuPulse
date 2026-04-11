@@ -5,10 +5,27 @@ struct SettingsView: View {
     var anomalyDetector: AnomalyDetector
     var onCheckForUpdates: (() -> Void)? = nil
 
-    // Ticks every second so the learning-period countdown stays live.
-    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    @State private var now = Date()
-    @State private var localTestColor: String = "normal"
+    var body: some View {
+        TabView {
+            GeneralSettingsView(prefs: prefs, onCheckForUpdates: onCheckForUpdates)
+                .tabItem {
+                    Label("General", systemImage: "gearshape")
+                }
+            
+            #if DEBUG
+            DeveloperSettingsView(prefs: prefs, anomalyDetector: anomalyDetector)
+                .tabItem {
+                    Label("Developer", systemImage: "hammer")
+                }
+            #endif
+        }
+        .frame(width: 550)
+    }
+}
+
+struct GeneralSettingsView: View {
+    @ObservedObject var prefs: PreferencesManager
+    var onCheckForUpdates: (() -> Void)? = nil
 
     var body: some View {
         Form {
@@ -57,7 +74,22 @@ struct SettingsView: View {
                 Text("Shows how much memory your Mac is using, right in the menu bar.")
                     .foregroundColor(.secondary)
             }
+        }
+        .padding(20)
+    }
+}
 
+struct DeveloperSettingsView: View {
+    @ObservedObject var prefs: PreferencesManager
+    var anomalyDetector: AnomalyDetector
+
+    // Ticks every second so the learning-period countdown stays live.
+    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    @State private var now = Date()
+    @State private var localTestColor: String = "normal"
+
+    var body: some View {
+        Form {
             Section {
                 Toggle("Testing Mode", isOn: $prefs.testingMode)
                 if prefs.testingMode {
@@ -87,7 +119,6 @@ struct SettingsView: View {
             }
         }
         .padding(20)
-        .frame(width: 420, height: prefs.testingMode ? 520 : 450)
         .onReceive(timer) { tick in
             now = tick
         }

@@ -6,6 +6,12 @@ struct MenuBarDiagnosticApp: App {
 
     var body: some Scene {
         // No windows — menu bar agent only
-        Settings { EmptyView() }
+        Settings {
+            SettingsView(
+                prefs: appDelegate.prefs,
+                anomalyDetector: appDelegate.anomalyDetector,
+                onCheckForUpdates: { appDelegate.sparkleUpdater.checkForUpdates() }
+            )
+        }
     }
 }

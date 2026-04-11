@@ -174,14 +174,28 @@ struct StatusMenuView: View {
             .font(.caption)
             .onHover { hoveredFooterButton = $0 ? "about" : nil }
             Spacer()
-            Button("Settings") {
-                onClosePopover()
-                onSettingsTap()
+            if #available(macOS 14.0, *) {
+                SettingsLink {
+                    Text("Settings")
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(hoveredFooterButton == "settings" ? .primary : .secondary)
+                .font(.caption)
+                .onHover { hoveredFooterButton = $0 ? "settings" : nil }
+                .simultaneousGesture(TapGesture().onEnded {
+                    onClosePopover()
+                    NSApp.activate(ignoringOtherApps: true)
+                })
+            } else {
+                Button("Settings") {
+                    onClosePopover()
+                    onSettingsTap()
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(hoveredFooterButton == "settings" ? .primary : .secondary)
+                .font(.caption)
+                .onHover { hoveredFooterButton = $0 ? "settings" : nil }
             }
-            .buttonStyle(.plain)
-            .foregroundColor(hoveredFooterButton == "settings" ? .primary : .secondary)
-            .font(.caption)
-            .onHover { hoveredFooterButton = $0 ? "settings" : nil }
             Spacer()
             Button("Quit") {
                 onClosePopover()
