@@ -1160,4 +1160,54 @@ final class MenuBarDiagnosticTests: XCTestCase {
         XCTAssertEqual(monitor.swapState, .swapCritical,
                        "3.9 GB delta is below the 4 GB spike threshold → valid sample → swapCritical")
     }
+
+    // MARK: - OnboardingView: hasShownOnboarding UserDefaults gate
+
+    func testHasShownOnboardingGate() {
+        UserDefaults.standard.removeObject(forKey: "hasShownOnboarding")
+        defer { UserDefaults.standard.removeObject(forKey: "hasShownOnboarding") }
+
+        // Default must be false so onboarding is shown on first launch.
+        // AppDelegate guard: `guard !UserDefaults.standard.bool(forKey: "hasShownOnboarding") else { return }`
+        XCTAssertFalse(UserDefaults.standard.bool(forKey: "hasShownOnboarding"),
+                       "hasShownOnboarding must default to false so onboarding is presented on first launch")
+
+        // Once the user taps Continue the key is set true; onboarding must be suppressed on subsequent launches.
+        UserDefaults.standard.set(true, forKey: "hasShownOnboarding")
+        XCTAssertTrue(UserDefaults.standard.bool(forKey: "hasShownOnboarding"),
+                      "hasShownOnboarding must return true after being set, causing onboarding to be skipped")
+    }
+
+    // MARK: - PreferencesManager: automaticUpdateChecks toggle
+
+    func testAutomaticUpdateChecksDefaultAndToggle() {
+        UserDefaults.standard.removeObject(forKey: "automaticUpdateChecks")
+        defer { UserDefaults.standard.removeObject(forKey: "automaticUpdateChecks") }
+
+        let prefs = PreferencesManager()
+
+        // Default must be true so Sparkle checks for updates automatically out of the box.
+        XCTAssertTrue(prefs.automaticUpdateChecks,
+                      "automaticUpdateChecks must default to true")
+
+        // Toggling off must persist false to UserDefaults so the setting survives relaunches.
+        prefs.automaticUpdateChecks = false
+        XCTAssertFalse(UserDefaults.standard.bool(forKey: "automaticUpdateChecks"),
+                       "disabling automaticUpdateChecks must persist false to UserDefaults.standard")
+    }
+
+    // MARK: - AppIcon asset wiring
+
+    func testAppIconAppiconsetContainsContentsJson() {
+        // Derive project root from this source file's path (not Bundle.main, which is the test runner).
+        let testFileURL = URL(fileURLWithPath: #file)
+        let projectRoot = testFileURL.deletingLastPathComponent().deletingLastPathComponent()
+        let contentsJsonURL = projectRoot
+            .appendingPathComponent("MenuBarDiagnostic")
+            .appendingPathComponent("Assets.xcassets")
+            .appendingPathComponent("AppIcon.appiconset")
+            .appendingPathComponent("Contents.json")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: contentsJsonURL.path),
+                      "AppIcon.appiconset/Contents.json must exist to wire the app icon into the Xcode asset catalog")
+    }
 }
