@@ -41,14 +41,22 @@ struct StatusMenuView: View {
                     .font(.caption)
                     .foregroundColor(anomalyCount > 0 ? .orange : .secondary)
             }
-            if swapMonitor.swapState == .rapidGrowth {
-                Text("Swap: growing rapidly")
+            if swapMonitor.swapState == .swapCritical {
+                Text("Swap: critical growth (1 GB+ / 5 min)")
                     .font(.caption)
                     .foregroundColor(.red)
-            } else if swapMonitor.swapState == .active {
-                Text("Swap: \(String(format: "%.1f GB", Double(swapMonitor.swapUsedBytes) / 1_073_741_824.0)) in use")
+            } else if swapMonitor.swapState == .swapSignificant {
+                Text("Swap: significant growth (500 MB+ / 5 min)")
                     .font(.caption)
                     .foregroundColor(.orange)
+            } else if swapMonitor.swapState == .swapMinor {
+                Text("Swap: growing (100 MB+ / 5 min)")
+                    .font(.caption)
+                    .foregroundColor(.yellow)
+            } else if swapMonitor.swapState == .compressedGrowing {
+                Text("Compressed memory growing (300 MB+ / 5 min)")
+                    .font(.caption)
+                    .foregroundColor(.yellow)
             }
         }
         .padding(.horizontal, 12)

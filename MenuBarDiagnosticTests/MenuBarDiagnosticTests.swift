@@ -451,29 +451,109 @@ final class MenuBarDiagnosticTests: XCTestCase {
                        "ignoredBundleIDs setter must join entries with comma into ignoredBundleIDsRaw")
     }
 
-    // MARK: - SwapMonitor: swapState computation
+    // MARK: - SwapMonitor: delta-based swapState computation
 
-    func testSwapStateNoneWhenZeroUsed() {
+    private let MB: UInt64 = 1_048_576
+    private let GB: UInt64 = 1_073_741_824
+
+    func testSwapStateNormalWhenNoSamples() {
         let monitor = SwapMonitor()
-        monitor.swapUsedBytes = 0
-        XCTAssertEqual(monitor.swapState, .none,
-                       "swapState must be .none when swapUsedBytes is 0")
+        // Fresh monitor with no samples injected → delta is 0 → normal
+        XCTAssertEqual(monitor.swapState, .normal,
+                       "swapState must be .normal when no samples have been injected")
     }
 
-    func testSwapStateActiveWhenNonZero() {
+    func testSwapStateNormalWhenSingleSample() {
         let monitor = SwapMonitor()
-        monitor.swapUsedBytes = 2 * 1_073_741_824
-        monitor.swapGrowthBytesPerSec = 0
-        XCTAssertEqual(monitor.swapState, .active,
-                       "swapState must be .active when bytes > 0 and growth <= 167_000")
+        // A single sample produces no delta (need at least 2 samples to compute delta)
+        monitor.injectSample(swapBytes: 2 * GB, compressedBytes: 0, at: Date())
+        XCTAssertEqual(monitor.swapState, .normal,
+                       "swapState must be .normal with only one sample (no delta computable)")
     }
 
-    func testSwapStateRapidGrowth() {
+    func testSwapStateNormalWhenLargeBytesButZeroDelta() {
+        // Large absolute swap value with zero delta → still normal
         let monitor = SwapMonitor()
-        monitor.swapUsedBytes = 1 * 1_073_741_824
-        monitor.swapGrowthBytesPerSec = 200_000
-        XCTAssertEqual(monitor.swapState, .rapidGrowth,
-                       "swapState must be .rapidGrowth when growth > 167_000 bytes/sec")
+        let now = Date()
+        monitor.injectSample(swapBytes: 5 * GB, compressedBytes: 0, at: now.addingTimeInterval(-60))
+        monitor.injectSample(swapBytes: 5 * GB, compressedBytes: 0, at: now)
+        XCTAssertEqual(monitor.swapState, .normal,
+                       "swapState must be .normal when swap is large but delta is zero (no growth)")
+    }
+
+    func testSwapStateSwapMinorAt100MB() {
+        let monitor = SwapMonitor()
+        let now = Date()
+        monitor.injectSample(swapBytes: 0, compressedBytes: 0, at: now.addingTimeInterval(-240))
+        monitor.injectSample(swapBytes: 100 * MB, compressedBytes: 0, at: now)
+        XCTAssertEqual(monitor.swapState, .swapMinor,
+                       "swapState must be .swapMinor when swap delta is exactly 100 MB in 5 min")
+    }
+
+    func testSwapStateSwapMinorBelow500MB() {
+        let monitor = SwapMonitor()
+        let now = Date()
+        monitor.injectSample(swapBytes: 0, compressedBytes: 0, at: now.addingTimeInterval(-240))
+        monitor.injectSample(swapBytes: 499 * MB, compressedBytes: 0, at: now)
+        XCTAssertEqual(monitor.swapState, .swapMinor,
+                       "swapState must be .swapMinor when swap delta is 499 MB (just below significant threshold)")
+    }
+
+    func testSwapStateSwapSignificantAt500MB() {
+        let monitor = SwapMonitor()
+        let now = Date()
+        monitor.injectSample(swapBytes: 0, compressedBytes: 0, at: now.addingTimeInterval(-240))
+        monitor.injectSample(swapBytes: 500 * MB, compressedBytes: 0, at: now)
+        XCTAssertEqual(monitor.swapState, .swapSignificant,
+                       "swapState must be .swapSignificant when swap delta is exactly 500 MB in 5 min")
+    }
+
+    func testSwapStateSwapSignificantBelow1GB() {
+        let monitor = SwapMonitor()
+        let now = Date()
+        monitor.injectSample(swapBytes: 0, compressedBytes: 0, at: now.addingTimeInterval(-240))
+        monitor.injectSample(swapBytes: GB - 1, compressedBytes: 0, at: now)
+        XCTAssertEqual(monitor.swapState, .swapSignificant,
+                       "swapState must be .swapSignificant when swap delta is just below 1 GB")
+    }
+
+    func testSwapStateSwapCriticalAt1GB() {
+        let monitor = SwapMonitor()
+        let now = Date()
+        monitor.injectSample(swapBytes: 0, compressedBytes: 0, at: now.addingTimeInterval(-240))
+        monitor.injectSample(swapBytes: GB, compressedBytes: 0, at: now)
+        XCTAssertEqual(monitor.swapState, .swapCritical,
+                       "swapState must be .swapCritical when swap delta is exactly 1 GB in 5 min")
+    }
+
+    func testSwapStateCompressedGrowingAt300MB() {
+        let monitor = SwapMonitor()
+        let now = Date()
+        // Compressed grows 300 MB, swap stays at 0 → compressedGrowing
+        monitor.injectSample(swapBytes: 0, compressedBytes: 0, at: now.addingTimeInterval(-240))
+        monitor.injectSample(swapBytes: 0, compressedBytes: 300 * MB, at: now)
+        XCTAssertEqual(monitor.swapState, .compressedGrowing,
+                       "swapState must be .compressedGrowing when compressed delta >= 300 MB with no swap delta")
+    }
+
+    func testSwapStateSwapTakesPriorityOverCompressed() {
+        // When both swap (minor) and compressed (growing) thresholds are met, swap wins
+        let monitor = SwapMonitor()
+        let now = Date()
+        monitor.injectSample(swapBytes: 0, compressedBytes: 0, at: now.addingTimeInterval(-240))
+        monitor.injectSample(swapBytes: 100 * MB, compressedBytes: 300 * MB, at: now)
+        XCTAssertEqual(monitor.swapState, .swapMinor,
+                       "swapMinor must take priority over compressedGrowing when both thresholds are met")
+    }
+
+    func testSwapStateNormalWhenBelowAllThresholds() {
+        let monitor = SwapMonitor()
+        let now = Date()
+        // 99 MB swap delta and 299 MB compressed delta — both below thresholds
+        monitor.injectSample(swapBytes: 0, compressedBytes: 0, at: now.addingTimeInterval(-240))
+        monitor.injectSample(swapBytes: 99 * MB, compressedBytes: 299 * MB, at: now)
+        XCTAssertEqual(monitor.swapState, .normal,
+                       "swapState must be .normal when all deltas are below thresholds")
     }
 
     // MARK: - SwapMonitor: notification body
@@ -656,35 +736,57 @@ final class MenuBarDiagnosticTests: XCTestCase {
                       "recentSamples(since:) must exclude samples with timestamps before the cutoff")
     }
 
-    // MARK: - SwapMonitor: growth threshold boundary conditions
+    // MARK: - SwapMonitor: notification firing rules (significant/critical only)
 
-    func testSwapStateActiveAtExactThreshold() {
-        // growth == 167_000 is NOT above the threshold (> 167_000 is required for rapidGrowth)
+    func testNoNotificationForSwapMinor() {
+        // swapMinor must not trigger a notification
         let monitor = SwapMonitor()
-        monitor.swapUsedBytes = 1 * 1_073_741_824
-        monitor.swapGrowthBytesPerSec = 167_000
-        XCTAssertEqual(monitor.swapState, .active,
-                       "swapState must be .active when growth is exactly 167_000 (not strictly above threshold)")
+        let now = Date()
+        monitor.injectSample(swapBytes: 0, compressedBytes: 0, at: now.addingTimeInterval(-240))
+        monitor.injectSample(swapBytes: 150 * MB, compressedBytes: 0, at: now)
+        XCTAssertEqual(monitor.swapState, .swapMinor)
+        // checkAndMaybeNotify is the gate — swapMinor should NOT be driven to notify automatically.
+        // Verify that the sample() notification trigger only fires for significant/critical by
+        // checking that lastSwapNotificationDate is nil after injecting a minor sample.
+        XCTAssertNil(monitor.lastSwapNotificationDate,
+                     "injectSample must not auto-notify; notification is only sent by the sample() trigger for significant/critical")
     }
 
-    func testSwapStateRapidGrowthOneAboveThreshold() {
-        // growth == 167_001 is strictly above 167_000 → rapidGrowth
+    func testNoNotificationForCompressedGrowing() {
         let monitor = SwapMonitor()
-        monitor.swapUsedBytes = 1 * 1_073_741_824
-        monitor.swapGrowthBytesPerSec = 167_001
-        XCTAssertEqual(monitor.swapState, .rapidGrowth,
-                       "swapState must be .rapidGrowth when growth is 167_001 (one above threshold)")
+        let now = Date()
+        monitor.injectSample(swapBytes: 0, compressedBytes: 0, at: now.addingTimeInterval(-240))
+        monitor.injectSample(swapBytes: 0, compressedBytes: 400 * MB, at: now)
+        XCTAssertEqual(monitor.swapState, .compressedGrowing)
+        XCTAssertNil(monitor.lastSwapNotificationDate,
+                     "compressedGrowing must not trigger a notification")
     }
 
-    // MARK: - SwapMonitor: zero-used check takes priority over growth
-
-    func testSwapStateNoneWhenZeroUsedDespiteGrowth() {
-        // swapUsedBytes == 0 must yield .none even if growth is non-zero
+    func testNotificationForSwapSignificant() {
         let monitor = SwapMonitor()
-        monitor.swapUsedBytes = 0
-        monitor.swapGrowthBytesPerSec = 500_000
-        XCTAssertEqual(monitor.swapState, .none,
-                       "swapState must be .none when swapUsedBytes is 0, regardless of growth rate")
+        monitor.swapUsedBytes = 600 * MB   // absolute bytes for notification body
+        // checkAndMaybeNotify is exposed and called directly — simulates what sample() does
+        // when swapState == .swapSignificant
+        let sent = monitor.checkAndMaybeNotify(processes: [])
+        XCTAssertTrue(sent, "checkAndMaybeNotify must return true for first call (significant scenario)")
+    }
+
+    func testNotificationForSwapCritical() {
+        let monitor = SwapMonitor()
+        monitor.swapUsedBytes = 2 * GB
+        let sent = monitor.checkAndMaybeNotify(processes: [])
+        XCTAssertTrue(sent, "checkAndMaybeNotify must return true for first call (critical scenario)")
+    }
+
+    func testCriticalNotificationBodyDifferentFromSignificant() {
+        let monitor = SwapMonitor()
+        monitor.swapUsedBytes = 2 * GB
+        let criticalContent = monitor.buildNotificationContent(processes: [], state: .swapCritical)
+        let significantContent = monitor.buildNotificationContent(processes: [], state: .swapSignificant)
+        XCTAssertNotEqual(criticalContent.title, significantContent.title,
+                          "swapCritical and swapSignificant notifications must have different titles")
+        XCTAssertTrue(criticalContent.title.lowercased().contains("critical"),
+                      "swapCritical notification title must convey urgency")
     }
 
     // MARK: - SwapMonitor: cooldown expiry allows re-notification
@@ -850,8 +952,8 @@ final class MenuBarDiagnosticTests: XCTestCase {
 
     // (1) Anomaly alert sets orange icon state
     func testIconColorOrangeWhenPendingAnomalyAlert() {
-        // swapState = .none, pendingAnomalyAlert = true → orange
-        let color = iconColor(swapState: .none, pendingAnomalyAlert: true)
+        // swapState = .normal, pendingAnomalyAlert = true → orange
+        let color = iconColor(swapState: .normal, pendingAnomalyAlert: true)
         XCTAssertEqual(color, .systemOrange,
                        "icon color must be orange when swap is idle but a pending anomaly alert exists")
     }
@@ -859,7 +961,7 @@ final class MenuBarDiagnosticTests: XCTestCase {
     // (2) Popover open clears alert state — icon returns to green
     func testIconColorGreenAfterAlertCleared() {
         // Simulate the state after togglePopover sets pendingAnomalyAlert = false
-        let color = iconColor(swapState: .none, pendingAnomalyAlert: false)
+        let color = iconColor(swapState: .normal, pendingAnomalyAlert: false)
         XCTAssertEqual(color, .systemGreen,
                        "icon color must be green when swap is idle and no pending alert (simulates post-popover-open state)")
     }
@@ -879,7 +981,7 @@ final class MenuBarDiagnosticTests: XCTestCase {
 
         // The Combine sink in AppDelegate mirrors anomalousBundleIDs.isEmpty → pendingAnomalyAlert = false.
         let pendingAfterClear = !detector.anomalousBundleIDs.isEmpty
-        let color = iconColor(swapState: .none, pendingAnomalyAlert: pendingAfterClear)
+        let color = iconColor(swapState: .normal, pendingAnomalyAlert: pendingAfterClear)
         XCTAssertEqual(color, .systemGreen,
                        "icon color must be green once anomaly detector is empty and pendingAnomalyAlert is cleared")
     }
@@ -932,23 +1034,35 @@ final class MenuBarDiagnosticTests: XCTestCase {
 
         // With ≥1 anomaly, pendingAnomalyAlert becomes true → icon must be orange
         let pendingAlert = !detector.anomalousBundleIDs.isEmpty
-        let color = iconColor(swapState: .none, pendingAnomalyAlert: pendingAlert)
+        let color = iconColor(swapState: .normal, pendingAnomalyAlert: pendingAlert)
         XCTAssertEqual(color, .systemOrange,
                        "icon must be orange when multiple concurrent anomalies are present")
     }
 
-    // (5a) Edge case: swap rapidGrowth overrides pending alert → red, not orange
-    func testIconColorRedWhenSwapRapidGrowthOverridesPendingAlert() {
-        let color = iconColor(swapState: .rapidGrowth, pendingAnomalyAlert: true)
+    // (5a) Edge case: swapCritical overrides pending alert → red, not orange
+    func testIconColorRedWhenSwapCriticalOverridesPendingAlert() {
+        let color = iconColor(swapState: .swapCritical, pendingAnomalyAlert: true)
         XCTAssertEqual(color, .systemRed,
-                       "swap rapidGrowth must take highest priority — icon must be red even with a pending alert")
+                       "swapCritical must take highest priority — icon must be red even with a pending alert")
     }
 
-    // (5b) Edge case: swap active overrides no-pending-alert → orange
-    func testIconColorOrangeWhenSwapActiveNoPendingAlert() {
-        let color = iconColor(swapState: .active, pendingAnomalyAlert: false)
+    // (5b) Edge case: swapSignificant → orange regardless of pending alert
+    func testIconColorOrangeWhenSwapSignificantNoPendingAlert() {
+        let color = iconColor(swapState: .swapSignificant, pendingAnomalyAlert: false)
         XCTAssertEqual(color, .systemOrange,
-                       "icon must be orange when swap is active, regardless of pending alert state")
+                       "icon must be orange when swapSignificant, regardless of pending alert state")
+    }
+
+    // (5b2) Edge case: swapMinor → yellow
+    func testIconColorYellowWhenSwapMinor() {
+        let color = iconColor(swapState: .swapMinor, pendingAnomalyAlert: false)
+        XCTAssertEqual(color, .systemYellow, "icon must be yellow for swapMinor")
+    }
+
+    // (5b3) Edge case: compressedGrowing → yellow
+    func testIconColorYellowWhenCompressedGrowing() {
+        let color = iconColor(swapState: .compressedGrowing, pendingAnomalyAlert: false)
+        XCTAssertEqual(color, .systemYellow, "icon must be yellow for compressedGrowing")
     }
 
     // (5c) Edge case: no baseline → evaluate produces no anomaly → icon green
@@ -966,7 +1080,7 @@ final class MenuBarDiagnosticTests: XCTestCase {
                       "process with no baseline must not be flagged as anomalous")
 
         let pendingAlert = !detector.anomalousBundleIDs.isEmpty
-        let color = iconColor(swapState: .none, pendingAnomalyAlert: pendingAlert)
+        let color = iconColor(swapState: .normal, pendingAnomalyAlert: pendingAlert)
         XCTAssertEqual(color, .systemGreen,
                        "icon must be green when no anomaly is detected due to missing baseline")
     }
