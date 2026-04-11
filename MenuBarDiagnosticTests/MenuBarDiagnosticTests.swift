@@ -721,4 +721,146 @@ final class MenuBarDiagnosticTests: XCTestCase {
         monitor.stopMonitoring()
         // stopMonitoring on a monitor that was never started must not crash.
     }
+
+    // MARK: - DataStore: recentSamples returns empty for unknown bundle ID
+
+    func testRecentSamplesEmptyForUnknownBundleID() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let samples = store.recentSamples(for: "com.test.NeverInserted", since: Date().addingTimeInterval(-3600))
+        XCTAssertTrue(samples.isEmpty, "recentSamples must return empty for a bundle ID with no persisted samples")
+    }
+
+    // MARK: - DataStore: baseline is nil before recomputeBaselines is called
+
+    func testBaselineNilBeforeRecompute() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let processes = (1...10).map { i in
+            makeProcess(bundleID: "com.test.BeforeRecompute", memoryMB: Double(i * 10), pid: Int32(i))
+        }
+        store.persistSamples(processes)
+        Thread.sleep(forTimeInterval: 0.1)
+
+        // No recomputeBaselines call — baseline must remain nil
+        let baseline = store.baseline(for: "com.test.BeforeRecompute")
+        XCTAssertNil(baseline, "baseline must be nil when samples exist but recomputeBaselines has not been called")
+    }
+
+    // MARK: - linearRegressionSlope: single sample returns 0.0 (denominator guard)
+
+    func testLinearRegressionSlopeSingleSample() {
+        let detector = AnomalyDetector(dataStore: DataStore(path: ":memory:"), prefs: PreferencesManager())
+        let result = detector.linearRegressionSlope([(memoryMB: 100, timestamp: Date())])
+        XCTAssertEqual(result, 0.0, "linearRegressionSlope must return 0.0 for a single-sample array (denominator guard path)")
+    }
+
+    // MARK: - AnomalyDetector: anomaly < 10 min flags view but suppresses notification
+
+    func testAnomalyUnder10MinFlagsViewButNoNotification() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let bundleID = "com.test.Under10Min"
+        // Baseline p90 = 50 MB → default threshold = 125 MB
+        let baseProcs = (1...10).map { i in
+            makeProcess(bundleID: bundleID, memoryMB: 50, pid: Int32(i))
+        }
+        store.persistSamples(baseProcs)
+        Thread.sleep(forTimeInterval: 0.1)
+        store.recomputeBaselines()
+        Thread.sleep(forTimeInterval: 0.1)
+
+        // Two trend samples 1 second apart → positive slope
+        store.persistSamples([makeProcess(bundleID: bundleID, memoryMB: 100, pid: 900)])
+        Thread.sleep(forTimeInterval: 1.1)
+        store.persistSamples([makeProcess(bundleID: bundleID, memoryMB: 200, pid: 901)])
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let detector = AnomalyDetector(dataStore: store, prefs: PreferencesManager())
+        // Anomaly started only 5 minutes ago — below the 10-min persistence threshold for notifications
+        detector.anomalyStartDates[bundleID] = Date().addingTimeInterval(-5 * 60)
+
+        // 300 MB > 125 MB ✓; positive slope ✓; pressure .warning ✓
+        detector.evaluate(processes: [makeProcess(bundleID: bundleID, memoryMB: 300)],
+                          pressure: .warning)
+
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        XCTAssertTrue(detector.anomalousBundleIDs.contains(bundleID),
+                      "process must be flagged in the view even when anomaly duration is less than 10 min")
+        XCTAssertNil(detector.lastNotificationDates[bundleID],
+                     "no notification must be sent when anomaly has persisted for less than 10 minutes")
+    }
+
+    // MARK: - AnomalyDetector: multiple processes, only those above threshold are anomalous
+
+    func testMultipleProcessesPartiallyAnomalous() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let bundleA = "com.test.Multi.A"
+        let bundleB = "com.test.Multi.B"
+
+        // Baseline for A: p90 = 50 MB → threshold = 50 × 2.5 = 125 MB
+        let baseProcsA = (1...10).map { i in
+            makeProcess(bundleID: bundleA, memoryMB: 50, pid: Int32(i))
+        }
+        // Baseline for B: p90 = 200 MB → threshold = 200 × 2.5 = 500 MB
+        let baseProcsB = (1...10).map { i in
+            makeProcess(bundleID: bundleB, memoryMB: 200, pid: Int32(100 + i))
+        }
+        store.persistSamples(baseProcsA + baseProcsB)
+        Thread.sleep(forTimeInterval: 0.1)
+        store.recomputeBaselines()
+        Thread.sleep(forTimeInterval: 0.1)
+
+        // Positive trend samples for both, 1 second apart
+        store.persistSamples([
+            makeProcess(bundleID: bundleA, memoryMB: 100, pid: 1000),
+            makeProcess(bundleID: bundleB, memoryMB: 200, pid: 1001)
+        ])
+        Thread.sleep(forTimeInterval: 1.1)
+        store.persistSamples([
+            makeProcess(bundleID: bundleA, memoryMB: 200, pid: 1002),
+            makeProcess(bundleID: bundleB, memoryMB: 300, pid: 1003)
+        ])
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let detector = AnomalyDetector(dataStore: store, prefs: PreferencesManager())
+        detector.anomalyStartDates[bundleA] = Date().addingTimeInterval(-11 * 60)
+        detector.anomalyStartDates[bundleB] = Date().addingTimeInterval(-11 * 60)
+
+        // A at 300 MB > 125 MB threshold ✓; B at 300 MB < 500 MB threshold ✗
+        detector.evaluate(processes: [
+            makeProcess(bundleID: bundleA, memoryMB: 300),
+            makeProcess(bundleID: bundleB, memoryMB: 300)
+        ], pressure: .warning)
+
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        XCTAssertTrue(detector.anomalousBundleIDs.contains(bundleA),
+                      "A must be flagged: 300 MB > 125 MB threshold (p90 50 × 2.5)")
+        XCTAssertFalse(detector.anomalousBundleIDs.contains(bundleB),
+                       "B must NOT be flagged: 300 MB < 500 MB threshold (p90 200 × 2.5)")
+    }
+
+    // MARK: - PreferencesManager: isInLearningPeriod true and false
+
+    func testIsInLearningPeriodTrueAndFalse() {
+        // Just launched — learning period must be active
+        UserDefaults.standard.set(Date(), forKey: "firstLaunchDate")
+        let prefsNew = PreferencesManager()
+        XCTAssertTrue(prefsNew.isInLearningPeriod,
+                      "isInLearningPeriod must be true when firstLaunchDate is now")
+
+        // Launched 4 days ago — 3-day learning window has expired
+        UserDefaults.standard.set(Date().addingTimeInterval(-4 * 86400), forKey: "firstLaunchDate")
+        let prefsOld = PreferencesManager()
+        XCTAssertFalse(prefsOld.isInLearningPeriod,
+                       "isInLearningPeriod must be false when firstLaunchDate is 4 days ago")
+
+        // Restore: push firstLaunchDate well outside learning period for other tests
+        UserDefaults.standard.set(Date().addingTimeInterval(-7 * 86400), forKey: "firstLaunchDate")
+    }
 }
