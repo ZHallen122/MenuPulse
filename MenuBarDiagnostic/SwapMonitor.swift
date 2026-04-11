@@ -72,7 +72,11 @@ class SwapMonitor: ObservableObject {
                 content: content,
                 trigger: nil
             )
-            UNUserNotificationCenter.current().add(request)
+            UNUserNotificationCenter.current().add(request) { error in
+                if let error = error {
+                    NSLog("SwapMonitor: failed to schedule notification: %@", error.localizedDescription)
+                }
+            }
         }
         return true
     }

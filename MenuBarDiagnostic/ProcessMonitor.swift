@@ -276,7 +276,10 @@ class ProcessMonitor: ObservableObject {
         if cachedTotalRAMBytes == 0 {
             var total: UInt64 = 0
             var size = MemoryLayout<UInt64>.size
-            sysctlbyname("hw.memsize", &total, &size, nil, 0)
+            let sysRet = sysctlbyname("hw.memsize", &total, &size, nil, 0)
+            if sysRet != 0 {
+                NSLog("ProcessMonitor: sysctlbyname hw.memsize failed (errno=%d)", errno)
+            }
             cachedTotalRAMBytes = total
         }
 
