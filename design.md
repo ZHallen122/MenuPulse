@@ -145,10 +145,12 @@ Notification fires before macOS sends its low-memory alert. Shows the specific c
 Tier 2b — Swap Detection (Unique Differentiator)
 
 Why Swap Detection Matters for Apple Silicon Users
-On M-series Macs, when RAM is exhausted, macOS writes memory pages to the internal SSD (swap). This has two immediate consequences: (1) performance degrades significantly as SSD access is 10–100x slower than RAM, and (2) SSD write cycles are consumed, reducing long-term hardware lifespan. Users with 8–16GB MacBooks are especially affected and rarely have visibility into when this is happening.
+On M-series Macs, when RAM is exhausted, macOS writes memory pages to the internal SSD (swap). This has two consequences: (1) performance degrades as SSD access is 10–100x slower than RAM, and (2) SSD write cycles are consumed, reducing hardware lifespan. Users with 8–16GB MacBooks are especially affected and rarely have visibility into when this is actively happening.
 
 
-Bouncer detects Swap activation and escalates to the Orange alert state before performance becomes noticeably degraded. The Swap notification identifies the top memory consumer at the moment swap was triggered, giving users an immediate, specific target to act on.
+The key insight: macOS proactively moves inactive memory to swap even when overall pressure is green, meaning a large absolute swap value is normal and harmless. What matters is whether swap is actively growing. Bouncer monitors the rate of change (delta) of swap — not its absolute size — and only alerts when the system is actively writing to SSD at a meaningful rate. This distinction prevents the false positives that a naive implementation would produce constantly.
+
+Additionally, Bouncer monitors Compressed memory as an earlier warning signal. Since macOS compresses RAM before writing to disk, rising Compressed memory is a leading indicator of approaching swap pressure, giving users a chance to act before SSD writes begin.
 
 Swap Notification Template
 Title: "Your Mac is using disk as memory"Body: "Swap in use: 2.1GB. Performance is degrading and your SSD is absorbing write pressure. Biggest contributor: Slack (1.1GB)."Actions: [Restart Slack]  [Quit Slack]  [View All]
@@ -178,8 +180,8 @@ Meaning & Behavior
 Normal memory pressure. Icon is muted, easy to ignore. Users spend the majority of their time here.
 🟡 Yellow (warning)
 A specific app has deviated significantly from its memory baseline AND system pressure is elevated. Bouncer knows who is responsible.
-🟠 Orange (swap active)
-macOS has begun using the SSD as overflow memory. Performance is actively degrading and SSD write cycles are being consumed. This state is unique to Bouncer — no other menu bar tool surfaces it.
+🟠 Orange (swap growing)
+Swap is actively increasing at 500MB+ per 5 minutes. The system is writing to SSD right now — not historical swap data sitting idle, but real-time I/O pressure. Performance is degrading and SSD write cycles are being consumed. Triggered by delta, never by absolute swap size. This state is unique to Bouncer — no other menu bar tool surfaces it.
 🔴 Red (critical)
 Swap usage is growing rapidly and system is approaching crisis. Immediate action required.
 
@@ -267,14 +269,48 @@ Use proc_pid_rusage(pid, RUSAGE_INFO_V4) to read ri_phys_footprint for each proc
 Running App Discovery
 NSWorkspace.shared.runningApplications returns all running apps. Filter for apps with a valid bundleURL to exclude system daemons. For menu bar agents (LSUIElement = true), additionally parse their Info.plist to confirm they are user-installed agents.
 
-Swap Usage Detection
+Swap Usage Detection — Delta-Based Logic
 Read swap usage via sysctlbyname("vm.swapusage"). Returns total swap capacity, bytes currently used, and bytes free. This API is public and requires no special permissions.
 
-Bouncer evaluates two swap conditions independently:
-Swap activated: swap used crosses from 0 to any positive value — triggers Orange state and notification
-Swap growing rapidly: swap used increases by more than 500MB within a 5-minute window — triggers Red state
+Critical Design Note: Delta Only, Never Absolute Value
+A common implementation mistake is triggering alerts based on the absolute swap value (e.g., "swap > 0 = alert"). This produces constant false positives. macOS proactively writes inactive memory pages to SSD before pressure becomes critical — meaning a user can have 4GB of swap while memory pressure is completely green. That swap represents historical activity, not a current problem. Bouncer must monitor the rate of change (delta) of swap over time, not its absolute size.
 
-At the moment swap is detected, Bouncer captures a snapshot of the top 3 memory consumers. The single largest consumer is named in the notification. This correlation — swap event + top culprit — is the core of the swap alert value proposition and is not replicated by any existing tool.
+
+The correct mental model: Swap absolute value = how much was written in the past. Swap delta = what is happening right now. Only the delta reflects real-time I/O pressure and active SSD consumption.
+
+Compressed Memory as Early Warning Signal
+macOS processes memory pressure in a strict priority order: free RAM first, then compress inactive pages (Compressed), then write to SSD (Swap). This means Compressed memory growing rapidly is a leading indicator that Swap pressure is coming. Bouncer monitors both metrics and uses Compressed growth as an earlier, softer warning before Swap activity begins.
+
+Read Compressed memory via host_statistics64 with HOST_VM_INFO64, specifically the compressor_page_count field multiplied by the system page size.
+
+Complete Alert Trigger Conditions
+Condition
+Icon State
+Notification
+Trigger
+Compressed growing
+🟡 Yellow
+No notification
+Compressed memory increases 300MB+ in 5 minutes. System is under pressure but managing without SSD writes yet. Early warning only.
+Swap delta minor
+🟡 Yellow
+No notification
+Swap increases 100–200MB in 5 minutes. System is beginning to write to SSD but at low intensity.
+Swap delta significant
+🟠 Orange
+Yes — names top culprit
+Swap increases 500MB+ in 5 minutes. Active I/O pressure. SSD write cycles being consumed at meaningful rate.
+Swap delta critical
+🔴 Red
+Yes — urgent tone
+Swap increases 1GB+ in 5 minutes. Severe active pressure. Performance degrading rapidly.
+Swap static (any size)
+No change
+No notification
+Swap absolute value is large but delta ≈ 0. This is historical data, not a current problem. Never alert on this.
+
+
+At the moment a Swap delta threshold is crossed, Bouncer captures a snapshot of the top 3 memory consumers. The single largest consumer at that moment is named in the notification as the most likely contributor. This correlation — swap delta event + named culprit — is the core value of Bouncer's swap detection and is not replicated by any existing tool.
 
 App Actions (Restart / Quit / Disable at Login)
 All three user-facing actions use NSRunningApplication.terminate() as the first step — never SIGKILL. This triggers the app's normal quit flow, allowing it to save state and clean up. Using SIGKILL would risk data loss and generate negative reviews.
@@ -302,8 +338,36 @@ System-level memory pressure is warning or critical (not normal)
 
 A notification is sent only when the app has been anomalous for 10+ consecutive minutes AND no notification has been sent for that app in the past 24 hours.
 
-6.6 Cold Start (Learning Period)
-On first launch, Bouncer has no baselines. For the first 3 days, it operates in silent observation mode — sampling data but not sending notifications. The UI shows a learning progress indicator: "Bouncer is learning your app patterns. Smart alerts start in 2 days." After 3 days, baselines are computed and active monitoring begins. This prevents a flood of false-positive alerts on day one and gives users a reason to keep the app installed through the evaluation period.
+6.6 Baseline Lifecycle & Learning Logic
+Bouncer assigns each app its own independent baseline state. This handles both the initial cold start and ongoing changes like new apps, version updates, and long-dormant apps returning.
+
+First Launch (Global Cold Start)
+On first launch, Bouncer has no baselines for any app. It enters a 3-day global silent observation mode — sampling all running apps every 30 seconds but sending zero notifications. The popover shows a progress indicator: "Bouncer is learning your app patterns. Smart alerts start in 2 days." After 3 days, P90 baselines are computed for every observed app and active monitoring begins. This prevents false-positive floods on day one and gives users a reason to keep the app installed through the evaluation period.
+
+New App Discovered After Day 3
+When Bouncer encounters a bundle ID it has never seen before, it starts an independent 3-day learning period for that app only. All other already-monitored apps continue operating normally. The new app is marked as "Learning" in the popover with a small indicator. Bouncer does not use a global default baseline as a temporary stand-in — the risk of false positives from an untrained estimate is higher than the cost of a short silent period.
+
+App Version Change
+A major app update can significantly change its normal memory footprint — for example, an app that used 300MB on v4 may legitimately use 500MB on v5. To avoid persistent false alerts after updates, Bouncer reads CFBundleShortVersionString from each app's Info.plist on every sample. If the version string changes, Bouncer automatically resets that app's baseline and restarts its 3-day learning period. The user sees a one-time note in the popover: "Slack was updated — relearning memory profile."
+
+Long-Dormant App Returns
+If an app has not been observed for more than 30 days, its baseline is marked as stale. When it next appears in the running app list, Bouncer restarts a 3-day learning period rather than relying on outdated data. Usage patterns and app memory profiles can change significantly over a month.
+
+Baseline State Machine
+State
+Behavior
+learning
+App first seen or recently reset. Sampling silently, no alerts. Transitions to active after 3 days.
+active
+Baseline established. Full anomaly detection and notifications enabled.
+stale
+App not seen in 30+ days. Transitions back to learning when app next runs.
+ignored
+User has added app to ignore list. Sampled but never alerted. Manually reversible in settings.
+
+
+Data Model Update
+The baselines table stores two additional fields to support this lifecycle: version (the last observed CFBundleShortVersionString) and state (one of: learning, active, stale, ignored). The samples table is unchanged.
 
 6.7 Performance Targets
 Metric
