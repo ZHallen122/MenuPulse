@@ -1,0 +1,147 @@
+name: macOS Build & Release (Sparkle)
+
+on:
+  push:
+    tags:
+      - 'v*' # 只在推送版本标签（例如 v1.0.0）时触发
+  workflow_dispatch: # 允许在 Actions 页面手动触发用作测试
+
+jobs:
+  build:
+    name: Build, Sign and Notarize
+    runs-on: macos-latest
+
+    env:
+      DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+      APP_NAME: "Menu Bar Diagnostic"
+      SCHEME: "MenuBarDiagnostic"
+      ARCHIVE_PATH: "build/MenuBarDiagnostic.xcarchive"
+      EXPORT_PATH: "build/export"
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure App Store Connect API Key
+        env:
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys/
+          echo "$ASC_PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+
+      - name: Create ExportOptions.plist
+        run: |
+          # 自动注入 teamID 到 ExportOptions.plist 以便 xcodebuild 正确归属开发者账号
+          cat <<EOF > ExportOptions.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>developer-id</string>
+              <key>destination</key>
+              <string>export</string>
+          </dict>
+          </plist>
+          EOF
+
+      - name: Build and Archive
+        run: |
+          xcodebuild archive \
+            -project "$APP_NAME.xcodeproj" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -archivePath "$ARCHIVE_PATH" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8 \
+            -authenticationKeyID ${{ secrets.ASC_KEY_ID }} \
+            -authenticationKeyIssuerID ${{ secrets.ASC_ISSUER_ID }}
+
+      - name: Export Archive
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportOptionsPlist ExportOptions.plist \
+            -exportPath "$EXPORT_PATH" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8 \
+            -authenticationKeyID ${{ secrets.ASC_KEY_ID }} \
+            -authenticationKeyIssuerID ${{ secrets.ASC_ISSUER_ID }}
+
+      - name: Notarize App
+        run: |
+          # 先将暂未 staple 的 app 压缩，供公证服务器分析
+          /usr/bin/ditto -c -k --keepParent "$EXPORT_PATH/$APP_NAME.app" "build/$APP_NAME-notarize.zip"
+          
+          # 提交公证请求（此过程大约需要等待2-5分钟）
+          xcrun notarytool submit "build/$APP_NAME-notarize.zip" \
+            --key ~/".appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8" \
+            --key-id ${{ secrets.ASC_KEY_ID }} \
+            --issuer ${{ secrets.ASC_ISSUER_ID }} \
+            --wait
+
+          # 将公证结果(Ticket) 附着("Staple")到 App 内部
+          xcrun stapler staple "$EXPORT_PATH/$APP_NAME.app"
+          
+      - name: Create .zip for Sparkle
+        run: |
+          # 制作一个含有已 Stapled App 的稳定版本 Zip (Sparkle 的标准使用格式)
+          /usr/bin/ditto -c -k --keepParent "$EXPORT_PATH/$APP_NAME.app" "build/$APP_NAME.zip"
+
+      - name: Create .dmg
+        run: |
+          brew install create-dmg
+          create-dmg \
+            --volname "$APP_NAME" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "$APP_NAME.app" 175 190 \
+            --hide-extension "$APP_NAME.app" \
+            --app-drop-link 425 190 \
+            "build/$APP_NAME.dmg" \
+            "$EXPORT_PATH/$APP_NAME.app"
+            
+          # 提交 DMG 的公证申请 (推荐做法，让用户挂载时不会遇到烦人的未验证提示)
+          xcrun notarytool submit "build/$APP_NAME.dmg" \
+            --key ~/".appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8" \
+            --key-id ${{ secrets.ASC_KEY_ID }} \
+            --issuer ${{ secrets.ASC_ISSUER_ID }} \
+            --wait
+            
+          xcrun stapler staple "build/$APP_NAME.dmg"
+
+      - name: Generate Sparkle EdDSA Signature
+        env:
+          SPARKLE_EDDSA_KEY: ${{ secrets.SPARKLE_EDDSA_KEY }}
+        run: |
+          mkdir -p /tmp/sparkle
+          # 下载与项目中一致的系统版本对应的工具链 (2.9.1 是根据 SPM 的 Package.resolved 探测的)
+          curl -L -o /tmp/sparkle/Sparkle.tar.xz "https://github.com/sparkle-project/Sparkle/releases/download/2.9.1/Sparkle-2.9.1.tar.xz"
+          tar -xf /tmp/sparkle/Sparkle.tar.xz -C /tmp/sparkle/
+          
+          # 利用 EdDSA 私钥一键生成版本签名的公钥内容
+          SIGNATURE=$(/tmp/sparkle/bin/sign_update -s "$SPARKLE_EDDSA_KEY" "build/$APP_NAME.zip")
+          echo "SPARKLE_SIGNATURE=$SIGNATURE" >> $GITHUB_ENV
+          
+          # 输出成文本，供你在 Actions 页面快速下载查看
+          echo "$SIGNATURE" > build/sparkle_signature.txt
+          
+          # 你可以在这里补充自动化更新 appcast.xml 的脚本，或者仅使用上面的输出手动更新
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') # 此处保证是 tag 构建时发布
+        with:
+          files: |
+            build/*.dmg
+            build/*.zip
+            build/sparkle_signature.txt
+          body: |
+            ## 本版本更新概要
+            这是你的最新构建。请把对应的信息更新到 \`appcast.xml\` 中去。
+            
+            **Sparkle EdDSA Signature**: \`${{ env.SPARKLE_SIGNATURE }}\`
+          draft: true
+          generate_release_notes: true
