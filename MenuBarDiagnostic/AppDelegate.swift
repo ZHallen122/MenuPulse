@@ -20,7 +20,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var hudWindow: HUDWindow?
     private var settingsWindow: NSWindow?
     private var cancellables = Set<AnyCancellable>()
-    private var pendingAnomalyAlert = false
+    var pendingAnomalyAlert = false
 
     let prefs = PreferencesManager()
     lazy var monitor: ProcessMonitor = ProcessMonitor(prefs: prefs)
@@ -214,13 +214,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateIconTint() {
-        let color: NSColor
-        switch swapMonitor.swapState {
-        case .rapidGrowth: color = .systemRed
-        case .active:      color = .systemOrange
-        case .none:        color = pendingAnomalyAlert ? .systemOrange : .systemGreen
-        }
-        statusItem?.button?.contentTintColor = color
+        statusItem?.button?.contentTintColor = iconColor(
+            swapState: swapMonitor.swapState,
+            pendingAnomalyAlert: pendingAnomalyAlert
+        )
     }
 
     private func applyLaunchAtLogin(_ enabled: Bool) {
