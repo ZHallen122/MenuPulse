@@ -23,6 +23,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var popover: NSPopover?
     private var hudWindow: HUDWindow?
     private var settingsWindow: NSWindow?
+    private var onboardingWindow: NSWindow?
     private var cancellables = Set<AnyCancellable>()
     private(set) var pendingAnomalyAlert = false
     private var testIconColor: String = "normal"
@@ -36,6 +37,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var monitor: ProcessMonitor = ProcessMonitor(prefs: prefs)
     lazy var anomalyDetector: AnomalyDetector = AnomalyDetector(dataStore: monitor.dataStore, prefs: prefs)
     lazy var swapMonitor = SwapMonitor()
+    lazy var sparkleUpdater = SparkleUpdater()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -49,6 +51,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         setupPopover()
+        showOnboardingIfNeeded()
         setupNotifications()
         monitor.startMonitoring()
         swapMonitor.startMonitoring()
@@ -127,17 +130,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         swapMonitor.stopMonitoring()
     }
 
+    private func showOnboardingIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: "hasShownOnboarding") else { return }
+        let view = OnboardingView { [weak self] in
+            UserDefaults.standard.set(true, forKey: "hasShownOnboarding")
+            self?.onboardingWindow?.orderOut(nil)
+            self?.onboardingWindow = nil
+        }
+        let vc = NSHostingController(rootView: view)
+        let win = NSWindow(contentViewController: vc)
+        win.title = "Welcome to Bouncer"
+        win.styleMask = [.titled, .closable]
+        win.isReleasedWhenClosed = false
+        win.center()
+        onboardingWindow = win
+        win.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     private func setupNotifications() {
         let center = UNUserNotificationCenter.current()
-
-        // Request permission to show alerts and play sounds.
-        center.requestAuthorization(options: [.alert, .sound]) { granted, error in
-            if let error = error {
-                NSLog("Bouncer: notification authorization error: %@", error.localizedDescription)
-            } else if !granted {
-                NSLog("Bouncer: notification permission denied by user")
-            }
-        }
 
         // Register the "MEMORY_ANOMALY" category with Restart Now and Ignore actions.
         let restartAction = UNNotificationAction(
@@ -209,7 +221,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.activate(ignoringOtherApps: true)
             return
         }
-        let vc = NSHostingController(rootView: SettingsView(prefs: prefs, anomalyDetector: anomalyDetector))
+        let vc = NSHostingController(rootView: SettingsView(
+            prefs: prefs,
+            anomalyDetector: anomalyDetector,
+            onCheckForUpdates: { [weak self] in self?.sparkleUpdater.checkForUpdates() }
+        ))
         let win = NSWindow(contentViewController: vc)
         win.title = "Bouncer Settings"
         win.styleMask = [.titled, .closable, .resizable, .miniaturizable]

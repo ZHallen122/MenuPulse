@@ -47,3 +47,5 @@ It wires `AppDelegate` via `@NSApplicationDelegateAdaptor`; `AppDelegate` owns t
 | Storage | `DataStore.swift` (SQLite) |
 | HUD UI | `HUDView.swift`, `HUDWindow.swift`, `HUDProcessRow.swift`, `ThermalHeaderView.swift`, `RAMBarView.swift`, `ProcessDetailSheet.swift` |
 | Settings | `PreferencesManager.swift`, `SettingsView.swift` |
+| Onboarding | `OnboardingView.swift` |
+| Auto-update | `SparkleUpdater.swift` |

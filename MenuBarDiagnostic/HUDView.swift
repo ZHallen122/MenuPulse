@@ -47,7 +47,7 @@ struct HUDView: View {
     @ViewBuilder
     private var processListView: some View {
         if monitor.processes.isEmpty {
-            Text("No menu bar processes found")
+            Text("No menu bar apps detected yet")
                 .foregroundColor(.secondary)
                 .font(.caption)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)

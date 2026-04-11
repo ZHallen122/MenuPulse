@@ -10,7 +10,7 @@ A native macOS menu bar app that watches other menu bar apps for memory anomalie
 
 ## What it does
 
-Bouncer sits in your menu bar as a stethoscope icon. It silently monitors the memory usage of every other menu bar app running on your Mac. When a process shows a sustained, upward memory trend that pushes into elevated system memory pressure, Bouncer notifies you — with a **Restart Now** or **Ignore** action — so you can act before the app causes a slowdown.
+Bouncer sits in your menu bar as a stethoscope-themed app icon (AppIcon.appiconset). It silently monitors the memory usage of every other menu bar app running on your Mac. When a process shows a sustained, upward memory trend that pushes into elevated system memory pressure, Bouncer notifies you — with a **Restart Now** or **Ignore** action — so you can act before the app causes a slowdown.
 
 The icon color reflects current system state at a glance:
 
@@ -35,6 +35,8 @@ The icon color reflects current system state at a glance:
 - **Memory sparklines** — Click the status icon to open the popover and see rolling memory sparklines for every monitored app. Anomalous apps are highlighted in amber.
 - **Swap memory detection** — `SwapMonitor` polls `vm.swapusage` every 30 seconds. When swap transitions from inactive to active, Bouncer sends a notification with **Quit Top App** / **View All** / **Dismiss** actions (1-hour cooldown). The icon turns orange while swap is in use, and red when swap is growing rapidly (> ~10 MB/min).
 - **Settings** — Configure the ignore list, sensitivity (Low / Medium / High), and launch at login.
+- **First-launch onboarding** — On first run a welcome sheet explains what Bouncer does and requests notification permission. Shown once, gated by `hasShownOnboarding`.
+- **Automatic updates** — Sparkle 2.9.1 checks for updates in the background. A "Check for Updates" button is available in Settings, and automatic checks can be toggled on/off.
 
 ---
 
@@ -88,6 +90,8 @@ ProcessMonitor  ──samples every 2s──►  AnomalyDetector
 | `SparklineView.swift` | `Canvas`-based rolling memory sparkline |
 | `PreferencesManager.swift` | `ObservableObject` wrapping `@AppStorage` user preferences |
 | `SettingsView.swift` | SwiftUI settings UI (ignore list, sensitivity, launch at login) |
+| `OnboardingView.swift` | First-launch onboarding sheet; requests notification permission; gated by `hasShownOnboarding` UserDefaults key |
+| `SparkleUpdater.swift` | Sparkle 2.9.1 wrapper; drives automatic and manual update checks |
 
 ---
 
@@ -142,6 +146,7 @@ xcodebuild -project "Menu Bar Diagnostic.xcodeproj" \
 | Ignore list | Apps in this list are never monitored or alerted on |
 | Sensitivity | Low / Medium / High — adjusts the p90 multiplier threshold |
 | Launch at login | Registers/unregisters via `SMAppService` |
+| Automatic updates | Enables background update checks via Sparkle; manual "Check for Updates" button always available |
 
 ---
 

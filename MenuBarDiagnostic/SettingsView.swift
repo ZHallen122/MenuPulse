@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var prefs: PreferencesManager
     var anomalyDetector: AnomalyDetector
+    var onCheckForUpdates: (() -> Void)? = nil
 
     // Ticks every second so the learning-period countdown stays live.
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -31,23 +32,29 @@ struct SettingsView: View {
             } header: {
                 Text("Exclusions")
             } footer: {
-                Text("Comma-separated bundle IDs. Matching apps are excluded from anomaly scanning.")
+                Text("Enter app bundle IDs separated by commas (e.g. com.example.App). Bouncer will skip these apps entirely.")
                     .foregroundColor(.secondary)
             }
 
             Section {
                 Toggle("Launch at Login", isOn: $prefs.launchAtLogin)
+                Toggle("Automatically Check for Updates", isOn: $prefs.automaticUpdateChecks)
+                Button("Check for Updates Now") {
+                    onCheckForUpdates?()
+                }
             } header: {
                 Text("System")
             } footer: {
-                Text("Starts Bouncer automatically when you log in.")
+                Text("Bouncer can start automatically at login, stay up to date in the background, or let you check for updates on demand.")
                     .foregroundColor(.secondary)
             }
 
             Section {
                 Toggle("Show Memory Pressure", isOn: $prefs.showMemoryPressureInMenuBar)
+            } header: {
+                Text("Display")
             } footer: {
-                Text("Displays RAM usage % next to the menu bar icon.")
+                Text("Shows how much memory your Mac is using, right in the menu bar.")
                     .foregroundColor(.secondary)
             }
 
@@ -112,8 +119,8 @@ struct SettingsView: View {
 
     private var developerFooter: String {
         if prefs.testingMode {
-            return "Testing Mode ON: learning period is 30 s, memory pressure guard bypassed, time windows collapsed to seconds. Reset → watch countdown → alerts fire automatically."
+            return "Testing Mode is active: thresholds and time windows are compressed so you can verify the full alert flow quickly. Reset the learning period, then fire a test alert to confirm everything works."
         }
-        return "Reset Learning Period restarts the 3-day window (Testing Mode OFF) to verify alerts are suppressed during learning."
+        return "Reset the learning period to restart the 3-day baseline window. Alerts are suppressed while Bouncer is still learning normal behavior."
     }
 }

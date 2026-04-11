@@ -177,9 +177,9 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
         content.title = "\(appName) is using too much memory"
         if currentMB >= 1000 {
             let gb = currentMB / 1024.0
-            content.body = String(format: "Using %.1f GB — %.1fx its normal level. System memory pressure is elevated.", gb, ratio)
+            content.body = String(format: "Using %.1f GB — %.1fx its normal level. Your Mac is running low on memory.", gb, ratio)
         } else {
-            content.body = String(format: "Using %.0f MB — %.1fx its normal level. System memory pressure is elevated.", currentMB, ratio)
+            content.body = String(format: "Using %.0f MB — %.1fx its normal level. Your Mac is running low on memory.", currentMB, ratio)
         }
         content.sound = .default
         content.categoryIdentifier = "MEMORY_ANOMALY"
