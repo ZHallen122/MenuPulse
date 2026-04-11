@@ -75,7 +75,7 @@ struct GeneralSettingsView: View {
                     .foregroundColor(.secondary)
             }
         }
-        .padding(20)
+        .formStyle(.grouped)
     }
 }
 
@@ -118,7 +118,7 @@ struct DeveloperSettingsView: View {
                     .foregroundColor(.secondary)
             }
         }
-        .padding(20)
+        .formStyle(.grouped)
         .onReceive(timer) { tick in
             now = tick
         }
