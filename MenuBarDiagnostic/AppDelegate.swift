@@ -14,6 +14,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let prefs = PreferencesManager()
     lazy var monitor: ProcessMonitor = ProcessMonitor(prefs: prefs)
     lazy var anomalyDetector: AnomalyDetector = AnomalyDetector(dataStore: monitor.dataStore, prefs: prefs)
+    lazy var swapMonitor = SwapMonitor()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -29,6 +30,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupPopover()
         setupNotifications()
         monitor.startMonitoring()
+        swapMonitor.startMonitoring()
+        swapMonitor.topProcessProvider = { [weak self] in self?.monitor.processes ?? [] }
 
         // Update menu bar title: show RAM % when enabled, otherwise blank.
         Publishers.CombineLatest(monitor.$systemRAMUsedBytes, monitor.$systemRAMTotalBytes)
@@ -55,15 +58,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &cancellables)
 
-        // Update icon tint color to reflect system memory pressure.
-        monitor.$memoryPressure
+        // Update icon tint: Red (swap rapid growth) > Orange (swap active) > Yellow (anomalies) > Green.
+        Publishers.CombineLatest(swapMonitor.$swapState, anomalyDetector.$anomalousBundleIDs)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] pressure in
+            .sink { [weak self] swapState, anomalousBundleIDs in
                 let color: NSColor
-                switch pressure {
-                case .normal:   color = .systemGreen
-                case .warning:  color = .systemOrange
-                case .critical: color = .systemRed
+                switch swapState {
+                case .rapidGrowth: color = .systemRed
+                case .active:      color = .systemOrange
+                case .none:        color = anomalousBundleIDs.isEmpty ? .systemGreen : .systemYellow
                 }
                 self?.statusItem?.button?.contentTintColor = color
             }
@@ -72,6 +75,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         monitor.stopMonitoring()
+        swapMonitor.stopMonitoring()
     }
 
     private func setupNotifications() {
@@ -97,13 +101,37 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             title: "Ignore",
             options: []
         )
-        let category = UNNotificationCategory(
+        let memoryAnomalyCategory = UNNotificationCategory(
             identifier: "MEMORY_ANOMALY",
             actions: [restartAction, ignoreAction],
             intentIdentifiers: [],
             options: []
         )
-        center.setNotificationCategories([category])
+
+        // Register the "SWAP_ACTIVE" category with swap-specific actions.
+        let quitTopAppAction = UNNotificationAction(
+            identifier: "QUIT_TOP_APP",
+            title: "Quit Top App",
+            options: .foreground
+        )
+        let viewAllAction = UNNotificationAction(
+            identifier: "VIEW_ALL",
+            title: "View All",
+            options: .foreground
+        )
+        let dismissAction = UNNotificationAction(
+            identifier: "DISMISS",
+            title: "Dismiss",
+            options: []
+        )
+        let swapActiveCategory = UNNotificationCategory(
+            identifier: "SWAP_ACTIVE",
+            actions: [quitTopAppAction, viewAllAction, dismissAction],
+            intentIdentifiers: [],
+            options: []
+        )
+
+        center.setNotificationCategories([memoryAnomalyCategory, swapActiveCategory])
 
         // Wire the shared anomaly detector into the process monitor.
         monitor.anomalyDetector = anomalyDetector
@@ -114,6 +142,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             monitor: monitor,
             prefs: prefs,
             anomalyDetector: anomalyDetector,
+            swapMonitor: swapMonitor,
             onSettingsTap: { [weak self] in self?.openSettings() },
             onClosePopover: { [weak self] in self?.popover?.performClose(nil) }
         ))

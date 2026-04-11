@@ -142,9 +142,21 @@ Pre-Crisis Notification with Action Button
 Notification fires before macOS sends its low-memory alert. Shows the specific culprit and offers "Restart Now" directly in the notification — no need to open the app. This is the feature that replaces the Activity Monitor workflow.
 
 
+Tier 2b — Swap Detection (Unique Differentiator)
+
+Why Swap Detection Matters for Apple Silicon Users
+On M-series Macs, when RAM is exhausted, macOS writes memory pages to the internal SSD (swap). This has two immediate consequences: (1) performance degrades significantly as SSD access is 10–100x slower than RAM, and (2) SSD write cycles are consumed, reducing long-term hardware lifespan. Users with 8–16GB MacBooks are especially affected and rarely have visibility into when this is happening.
+
+
+Bouncer detects Swap activation and escalates to the Orange alert state before performance becomes noticeably degraded. The Swap notification identifies the top memory consumer at the moment swap was triggered, giving users an immediate, specific target to act on.
+
+Swap Notification Template
+Title: "Your Mac is using disk as memory"Body: "Swap in use: 2.1GB. Performance is degrading and your SSD is absorbing write pressure. Biggest contributor: Slack (1.1GB)."Actions: [Restart Slack]  [Quit Slack]  [View All]
+
+
 Tier 3 — Retention (Gets People to Recommend It)
 
-Weekly digest: top memory consumer, average RAM usage, suggested optimizations
+Weekly digest: top memory consumer, average RAM usage, swap events this week, suggested optimizations
 Ghost process detection: apps whose menu bar icons are hidden but processes still consume RAM
 Dead agent detection: LaunchAgents still running for apps that were deleted months ago
 One-click restart: graceful terminate + relaunch without losing app state where possible
@@ -158,14 +170,18 @@ Design Philosophy
 
 
 5.2 Menu Bar Icon States
+Bouncer uses a four-level color system. The addition of an Orange state — triggered by Swap usage — is a key differentiator. No existing tool specifically alerts when macOS begins writing memory to disk.
+
 State
 Meaning & Behavior
-Green (default)
-Normal memory pressure — icon is muted, easy to ignore. Users spend 99% of their time here.
-Yellow (warning)
-An app has started deviating from baseline AND system pressure is elevated. Subtle attention signal.
-Red (critical)
-Memory pressure is high and a clear culprit is identified. Requires immediate user attention.
+🟢 Green (default)
+Normal memory pressure. Icon is muted, easy to ignore. Users spend the majority of their time here.
+🟡 Yellow (warning)
+A specific app has deviated significantly from its memory baseline AND system pressure is elevated. Bouncer knows who is responsible.
+🟠 Orange (swap active)
+macOS has begun using the SSD as overflow memory. Performance is actively degrading and SSD write cycles are being consumed. This state is unique to Bouncer — no other menu bar tool surfaces it.
+🔴 Red (critical)
+Swap usage is growing rapidly and system is approaching crisis. Immediate action required.
 
 
 5.3 Popover Layout
@@ -175,8 +191,12 @@ Clicking the menu bar icon opens a native NSPopover (not a window). Fixed width:
 Shows the current top memory consumers. Each row: app icon, app name, current RAM, and a small inline sparkline. Anomalous apps are pinned to the top with a subtle amber background. Normal apps are shown in subdued secondary text color. Clicking any row expands an inline detail card with:
 Current vs. baseline memory
 30-minute trend description ("increasing" / "stable" / "decreasing")
-[Restart App] button
-[Add to Ignore List] button
+[Restart] — quit and relaunch, memory cleared, app stays running
+[Quit] — gracefully exit, app removed from memory until manually reopened
+[Disable at Login] — quit and remove from login items permanently
+[Add to Ignore List] — stop monitoring this app
+
+The three action buttons follow a severity gradient: Restart is the lightest intervention, Quit is moderate, and Disable at Login is the most permanent. This progression gives users a clear mental model for how to respond to different situations.
 
 "History" View — Secondary
 A 7-day timeline of memory pressure events, showing which app triggered each alert and what action was taken. Useful for identifying chronic offenders. Simple list, no complex charts.
@@ -185,13 +205,18 @@ A 7-day timeline of memory pressure events, showing which app triggered each ale
 Bouncer sends at most 2–3 notifications per day. Each notification follows this structure:
 
 Notification Template
-Title: "[App Name] memory abnormal"Body: "Using [X]GB — [N]x its normal level. System memory pressure is elevated."Actions: [Restart Now]  [Ignore]
+Title: "[App Name] memory abnormal"Body: "Using [X]GB — [N]x its normal level. System memory pressure is elevated."Actions: [Restart]  [Quit]  [Ignore]
 
 
-The "Restart Now" action executes without opening the app — the entire fix happens from the notification. This is the most important interaction in the product.
+The notification exposes two immediate actions:
+Restart — gracefully quits and relaunches the app. Use this when you still need the app running but want to clear its memory leak.
+Quit — gracefully quits the app without relaunching. Use this when you don't need the app right now and want to reclaim the RAM immediately.
+
+Both actions execute directly from the notification without opening Bouncer. "Disable at Login" is intentionally omitted from the notification — it is a heavier, less reversible decision that belongs in the popover, not in a transient alert.
 
 5.5 Settings
-Deliberately minimal. Only three user-configurable items in v1:
+Deliberately minimal. Only four user-configurable items in v1:
+Menu Bar Display — None (default) / Memory Pressure % / RAM Used. Allows users who want at-a-glance stats to opt in without changing the default experience for everyone else.
 Ignore list — apps Bouncer should never alert about (e.g., Xcode, Figma — expected heavy users)
 Sensitivity — Conservative / Default / Aggressive (controls the anomaly detection threshold multiplier)
 Launch at login — on/off
@@ -242,8 +267,23 @@ Use proc_pid_rusage(pid, RUSAGE_INFO_V4) to read ri_phys_footprint for each proc
 Running App Discovery
 NSWorkspace.shared.runningApplications returns all running apps. Filter for apps with a valid bundleURL to exclude system daemons. For menu bar agents (LSUIElement = true), additionally parse their Info.plist to confirm they are user-installed agents.
 
-App Restart
-Call NSRunningApplication.terminate() for graceful quit (triggers normal app quit flow, preserving state). After a 2-second confirmation delay, relaunch using NSWorkspace.shared.open(). Do not use SIGKILL — it prevents apps from saving state and would earn negative reviews.
+Swap Usage Detection
+Read swap usage via sysctlbyname("vm.swapusage"). Returns total swap capacity, bytes currently used, and bytes free. This API is public and requires no special permissions.
+
+Bouncer evaluates two swap conditions independently:
+Swap activated: swap used crosses from 0 to any positive value — triggers Orange state and notification
+Swap growing rapidly: swap used increases by more than 500MB within a 5-minute window — triggers Red state
+
+At the moment swap is detected, Bouncer captures a snapshot of the top 3 memory consumers. The single largest consumer is named in the notification. This correlation — swap event + top culprit — is the core of the swap alert value proposition and is not replicated by any existing tool.
+
+App Actions (Restart / Quit / Disable at Login)
+All three user-facing actions use NSRunningApplication.terminate() as the first step — never SIGKILL. This triggers the app's normal quit flow, allowing it to save state and clean up. Using SIGKILL would risk data loss and generate negative reviews.
+
+Restart: call terminate(), wait up to 3 seconds for the process to exit, then relaunch via NSWorkspace.shared.open(bundleURL). If the process has not exited after 3 seconds, show a warning rather than force-killing.
+
+Quit: call terminate() only. No relaunch. The app stays out of memory until the user manually reopens it.
+
+Disable at Login: call terminate(), then locate and disable the app's LaunchAgent plist in ~/Library/LaunchAgents/ using SMAppService.mainApp.unregister() where available, or by setting the Disabled key in the plist directly for older agents. Show a confirmation before executing — this is the most permanent of the three actions and should not be accidental.
 
 6.4 Data Model
 
@@ -306,7 +346,13 @@ Anomaly detection engine (all 3 conditions)
 IN v1.0
 Smart notifications with "Restart Now" action button
 IN v1.0
-One-click app restart (graceful)
+Three-action intervention: Restart, Quit, Disable at Login
+IN v1.0
+Swap detection: Orange alert state when macOS begins writing to SSD
+IN v1.0
+Swap notification: names top memory consumer at moment swap is triggered
+IN v1.0
+Menu bar display setting: off (default) / Memory Pressure % / RAM Used
 IN v1.0
 Ignore list for specific apps
 IN v1.0

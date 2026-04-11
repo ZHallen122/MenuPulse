@@ -5,6 +5,7 @@ struct StatusMenuView: View {
     @ObservedObject var monitor: ProcessMonitor
     @ObservedObject var prefs: PreferencesManager
     @ObservedObject var anomalyDetector: AnomalyDetector
+    @ObservedObject var swapMonitor: SwapMonitor
     var onSettingsTap: () -> Void
     var onClosePopover: () -> Void = {}
     @State private var expandedPID: pid_t? = nil
@@ -39,6 +40,15 @@ struct StatusMenuView: View {
                 Text("\(anomalyCount) behaving abnormally")
                     .font(.caption)
                     .foregroundColor(anomalyCount > 0 ? .orange : .secondary)
+            }
+            if swapMonitor.swapState == .rapidGrowth {
+                Text("Swap: growing rapidly")
+                    .font(.caption)
+                    .foregroundColor(.red)
+            } else if swapMonitor.swapState == .active {
+                Text("Swap: \(String(format: "%.1f GB", Double(swapMonitor.swapUsedBytes) / 1_073_741_824.0)) in use")
+                    .font(.caption)
+                    .foregroundColor(.orange)
             }
         }
         .padding(.horizontal, 12)
@@ -340,5 +350,6 @@ private struct ProcessRowView: View {
     let prefs = PreferencesManager()
     let monitor = ProcessMonitor(prefs: prefs)
     let detector = AnomalyDetector(dataStore: monitor.dataStore, prefs: prefs)
-    return StatusMenuView(monitor: monitor, prefs: prefs, anomalyDetector: detector, onSettingsTap: {})
+    let swapMonitor = SwapMonitor()
+    return StatusMenuView(monitor: monitor, prefs: prefs, anomalyDetector: detector, swapMonitor: swapMonitor, onSettingsTap: {})
 }

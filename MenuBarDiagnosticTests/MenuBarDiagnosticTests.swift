@@ -450,6 +450,69 @@ final class MenuBarDiagnosticTests: XCTestCase {
                        "ignoredBundleIDs setter must join entries with comma into ignoredBundleIDsRaw")
     }
 
+    // MARK: - SwapMonitor: swapState computation
+
+    func testSwapStateNoneWhenZeroUsed() {
+        let monitor = SwapMonitor()
+        monitor.swapUsedBytes = 0
+        XCTAssertEqual(monitor.swapState, .none,
+                       "swapState must be .none when swapUsedBytes is 0")
+    }
+
+    func testSwapStateActiveWhenNonZero() {
+        let monitor = SwapMonitor()
+        monitor.swapUsedBytes = 2 * 1_073_741_824
+        monitor.swapGrowthBytesPerSec = 0
+        XCTAssertEqual(monitor.swapState, .active,
+                       "swapState must be .active when bytes > 0 and growth <= 167_000")
+    }
+
+    func testSwapStateRapidGrowth() {
+        let monitor = SwapMonitor()
+        monitor.swapUsedBytes = 1 * 1_073_741_824
+        monitor.swapGrowthBytesPerSec = 200_000
+        XCTAssertEqual(monitor.swapState, .rapidGrowth,
+                       "swapState must be .rapidGrowth when growth > 167_000 bytes/sec")
+    }
+
+    // MARK: - SwapMonitor: notification body
+
+    func testSwapNotificationBody() {
+        let swapMon = SwapMonitor()
+        swapMon.swapUsedBytes = UInt64(2.1 * 1_073_741_824)
+        let processes = [makeProcess(bundleID: "com.tinyspeck.slackmacgap", memoryMB: 1126.4)]
+        let content = swapMon.buildNotificationContent(processes: processes)
+        XCTAssertTrue(content.title.contains("Your Mac is using disk as memory"),
+                      "notification title must contain 'Your Mac is using disk as memory'")
+        XCTAssertTrue(content.body.contains("Biggest contributor"),
+                      "notification body must name the biggest memory contributor")
+    }
+
+    // MARK: - SwapMonitor: 1-hour notification cooldown
+
+    func testSwapNotificationCooldown() {
+        let swapMon = SwapMonitor()
+        swapMon.swapUsedBytes = 1 * 1_073_741_824
+
+        // First call should go through (no prior date).
+        let firstSent = swapMon.checkAndMaybeNotify(processes: [])
+        XCTAssertTrue(firstSent, "first swap notification must be enqueued")
+
+        // Immediate second call must be blocked by the 1-hour cooldown.
+        let secondSent = swapMon.checkAndMaybeNotify(processes: [])
+        XCTAssertFalse(secondSent, "second swap notification within 1 hour must be suppressed")
+
+        // lastSwapNotificationDate must not have changed on the blocked call.
+        let dateAfterBlock = swapMon.lastSwapNotificationDate
+        swapMon.checkAndMaybeNotify(processes: [])
+        XCTAssertEqual(
+            swapMon.lastSwapNotificationDate?.timeIntervalSince1970 ?? 0,
+            dateAfterBlock?.timeIntervalSince1970 ?? 0,
+            accuracy: 1.0,
+            "lastSwapNotificationDate must remain unchanged during cooldown"
+        )
+    }
+
     // MARK: - AnomalyDetector: critical pressure triggers anomaly
 
     func testCriticalPressureMarksAnomalous() {
