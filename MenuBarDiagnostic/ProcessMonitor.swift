@@ -120,7 +120,12 @@ class ProcessMonitor: ObservableObject {
             let infoSize = Int32(MemoryLayout<proc_taskinfo>.size)
             let ret = proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &info, infoSize)
             guard ret == infoSize else {
-                NSLog("ProcessMonitor: proc_pidinfo failed for pid %d (ret=%d); skipping", pid, ret)
+                // ret == 0 with errno ESRCH or EPERM means the process just exited —
+                // normal race between runningApplications and actual exit; skip silently.
+                let e = errno
+                if ret != 0 || (e != ESRCH && e != EPERM) {
+                    NSLog("ProcessMonitor: proc_pidinfo failed for pid %d (ret=%d, errno=%d); skipping", pid, ret, e)
+                }
                 continue
             }
 
