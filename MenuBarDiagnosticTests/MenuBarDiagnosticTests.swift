@@ -654,4 +654,71 @@ final class MenuBarDiagnosticTests: XCTestCase {
         XCTAssertTrue(samples.isEmpty,
                       "recentSamples(since:) must exclude samples with timestamps before the cutoff")
     }
+
+    // MARK: - SwapMonitor: growth threshold boundary conditions
+
+    func testSwapStateActiveAtExactThreshold() {
+        // growth == 167_000 is NOT above the threshold (> 167_000 is required for rapidGrowth)
+        let monitor = SwapMonitor()
+        monitor.swapUsedBytes = 1 * 1_073_741_824
+        monitor.swapGrowthBytesPerSec = 167_000
+        XCTAssertEqual(monitor.swapState, .active,
+                       "swapState must be .active when growth is exactly 167_000 (not strictly above threshold)")
+    }
+
+    func testSwapStateRapidGrowthOneAboveThreshold() {
+        // growth == 167_001 is strictly above 167_000 → rapidGrowth
+        let monitor = SwapMonitor()
+        monitor.swapUsedBytes = 1 * 1_073_741_824
+        monitor.swapGrowthBytesPerSec = 167_001
+        XCTAssertEqual(monitor.swapState, .rapidGrowth,
+                       "swapState must be .rapidGrowth when growth is 167_001 (one above threshold)")
+    }
+
+    // MARK: - SwapMonitor: zero-used check takes priority over growth
+
+    func testSwapStateNoneWhenZeroUsedDespiteGrowth() {
+        // swapUsedBytes == 0 must yield .none even if growth is non-zero
+        let monitor = SwapMonitor()
+        monitor.swapUsedBytes = 0
+        monitor.swapGrowthBytesPerSec = 500_000
+        XCTAssertEqual(monitor.swapState, .none,
+                       "swapState must be .none when swapUsedBytes is 0, regardless of growth rate")
+    }
+
+    // MARK: - SwapMonitor: cooldown expiry allows re-notification
+
+    func testSwapCooldownExpiryAllowsNotification() {
+        let monitor = SwapMonitor()
+        monitor.swapUsedBytes = 1 * 1_073_741_824
+        // Simulate a notification sent 3601 seconds ago (just past the 1-hour cooldown)
+        monitor.lastSwapNotificationDate = Date().addingTimeInterval(-3601)
+        let sent = monitor.checkAndMaybeNotify(processes: [])
+        XCTAssertTrue(sent, "checkAndMaybeNotify must return true when cooldown has expired (> 3600 s)")
+    }
+
+    // MARK: - SwapMonitor: notification body without processes
+
+    func testSwapNotificationBodyWithNoProcesses() {
+        let monitor = SwapMonitor()
+        monitor.swapUsedBytes = 1 * 1_073_741_824
+        let content = monitor.buildNotificationContent(processes: [])
+        XCTAssertFalse(content.body.contains("Biggest contributor"),
+                       "notification body must NOT mention 'Biggest contributor' when process list is empty")
+    }
+
+    // MARK: - SwapMonitor: start/stop lifecycle smoke tests
+
+    func testStartThenStopMonitoringDoesNotCrash() {
+        let monitor = SwapMonitor()
+        monitor.startMonitoring()
+        monitor.stopMonitoring()
+        // If we reach here, no crash occurred.
+    }
+
+    func testStopMonitoringOnNeverStartedDoesNotCrash() {
+        let monitor = SwapMonitor()
+        monitor.stopMonitoring()
+        // stopMonitoring on a monitor that was never started must not crash.
+    }
 }
