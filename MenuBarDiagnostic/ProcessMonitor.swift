@@ -119,7 +119,10 @@ class ProcessMonitor: ObservableObject {
             var info = proc_taskinfo()
             let infoSize = Int32(MemoryLayout<proc_taskinfo>.size)
             let ret = proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &info, infoSize)
-            guard ret == infoSize else { continue }
+            guard ret == infoSize else {
+                NSLog("ProcessMonitor: proc_pidinfo failed for pid %d (ret=%d); skipping", pid, ret)
+                continue
+            }
 
             // Accumulated CPU time in nanoseconds (user + kernel threads combined).
             let cpuNow = info.pti_total_user + info.pti_total_system

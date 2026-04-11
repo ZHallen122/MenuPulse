@@ -82,7 +82,10 @@ class SwapMonitor: ObservableObject {
     private func sample() {
         var swapInfo = xsw_usage()
         var size = MemoryLayout<xsw_usage>.size
-        sysctlbyname("vm.swapusage", &swapInfo, &size, nil, 0)
+        if sysctlbyname("vm.swapusage", &swapInfo, &size, nil, 0) != 0 {
+            NSLog("SwapMonitor: sysctlbyname vm.swapusage failed (errno=%d)", errno)
+            return
+        }
 
         let now = Date()
         let used = swapInfo.xsu_used
