@@ -1,5 +1,9 @@
 import SwiftUI
 
+/// A SwiftUI view that renders a rolling memory or CPU trend as a filled area chart with a gradient.
+///
+/// Values are normalized relative to the visible maximum so the chart always fills the available
+/// height. When fewer than 2 data points are available, a placeholder rectangle is shown instead.
 struct SparklineView: View {
     let values: [Double]
     var color: Color = .blue

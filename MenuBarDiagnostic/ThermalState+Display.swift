@@ -1,5 +1,9 @@
 import SwiftUI
 
+/// Adds display helpers to `ProcessInfo.ThermalState` used by `ThermalHeaderView`.
+///
+/// Provides a human-readable label string (`thermalLabel`), an SF Symbol name (`thermalIcon`),
+/// and a semantic color (`thermalColor`) for each thermal state level.
 extension ProcessInfo.ThermalState {
     var thermalLabel: String {
         switch self {

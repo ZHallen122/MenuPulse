@@ -8,13 +8,14 @@ A native macOS menu bar app that watches other menu bar apps for memory anomalie
 
 Bouncer sits in your menu bar as a stethoscope icon. It silently monitors the memory usage of every other menu bar app running on your Mac. When a process shows a sustained, upward memory trend that pushes into elevated system memory pressure, Bouncer notifies you — with a **Restart Now** or **Ignore** action — so you can act before the app causes a slowdown.
 
-The icon color reflects current system memory pressure at a glance:
+The icon color reflects current system state at a glance:
 
 | Color | Meaning |
 |---|---|
-| Green | Normal |
-| Orange | Warning |
-| Red | Critical |
+| Green | All clear (no swap, no anomalies) |
+| Yellow | Memory anomaly detected |
+| Orange | Swap memory in use |
+| Red | Swap memory growing rapidly |
 
 ---
 
@@ -28,6 +29,7 @@ The icon color reflects current system memory pressure at a glance:
 - **Actionable notifications** — Each alert offers **Restart Now** (relaunches the offending app) or **Ignore**. A 24-hour per-app cooldown prevents repeat alerts for the same process.
 - **10-minute persistence gate** — An app must remain anomalous for 10 continuous minutes before a notification fires.
 - **Memory sparklines** — Click the status icon to open the popover and see rolling memory sparklines for every monitored app. Anomalous apps are highlighted in amber.
+- **Swap memory detection** — `SwapMonitor` polls `vm.swapusage` every 30 seconds. When swap transitions from inactive to active, Bouncer sends a notification with **Quit Top App** / **View All** / **Dismiss** actions (1-hour cooldown). The icon turns orange while swap is in use, and red when swap is growing rapidly (> ~10 MB/min).
 - **Settings** — Configure the ignore list, sensitivity (Low / Medium / High), and launch at login.
 
 ---
