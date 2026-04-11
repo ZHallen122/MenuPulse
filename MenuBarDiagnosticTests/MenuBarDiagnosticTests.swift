@@ -1103,4 +1103,61 @@ final class MenuBarDiagnosticTests: XCTestCase {
         // Restore: push firstLaunchDate well outside learning period for other tests
         UserDefaults.standard.set(Date().addingTimeInterval(-7 * 86400), forKey: "firstLaunchDate")
     }
+
+    // MARK: - SwapMonitor: positive-delta (min-in-window) and spike/sleep-wake filtering
+
+    func testSwapNegativeDeltaDoesNotTriggerAlert() {
+        // Swap went down over the window — min-based delta is 0 → normal.
+        let monitor = SwapMonitor()
+        let now = Date()
+        monitor.injectSample(swapBytes: 2 * GB, compressedBytes: 0, at: now.addingTimeInterval(-60))
+        monitor.injectSample(swapBytes: 1 * GB, compressedBytes: 0, at: now)
+        XCTAssertEqual(monitor.swapState, .normal,
+                       "Swap decreased over window → delta is 0 → normal state")
+    }
+
+    func testMinBasedDeltaDetectsGrowthAfterDipBelowSignificantThreshold() {
+        // Window: 4 GB → 3.4 GB (dip) → 4 GB
+        // oldest-based: 4 - 4 = 0 → would be normal (wrong — misses growth from the dip)
+        // min-based:    4 - 3.4 = 0.6 GB → swapSignificant (correct)
+        let monitor = SwapMonitor()
+        let now = Date()
+        monitor.injectSample(swapBytes: 4 * GB, compressedBytes: 0, at: now.addingTimeInterval(-120))
+        monitor.injectSample(swapBytes: UInt64(3.4 * Double(GB)), compressedBytes: 0, at: now.addingTimeInterval(-60))
+        monitor.injectSample(swapBytes: 4 * GB, compressedBytes: 0, at: now)
+        XCTAssertEqual(monitor.swapState, .swapSignificant,
+                       "min-based delta: 4 GB newest − 3.4 GB min = 0.6 GB → swapSignificant")
+    }
+
+    func testMinBasedDeltaCapturesGrowthDespitePartialRelease() {
+        // Window: 2 GB → 1.5 GB (partial release) → 3 GB
+        // oldest-based: 3 - 2 = 1 GB → swapCritical
+        // min-based:    3 - 1.5 = 1.5 GB → swapCritical (same tier, but correct magnitude)
+        let monitor = SwapMonitor()
+        let now = Date()
+        monitor.injectSample(swapBytes: 2 * GB, compressedBytes: 0, at: now.addingTimeInterval(-120))
+        monitor.injectSample(swapBytes: UInt64(1.5 * Double(GB)), compressedBytes: 0, at: now.addingTimeInterval(-60))
+        monitor.injectSample(swapBytes: 3 * GB, compressedBytes: 0, at: now)
+        XCTAssertEqual(monitor.swapState, .swapCritical,
+                       "3 GB − 1.5 GB window-min = 1.5 GB delta → swapCritical")
+    }
+
+    func testSinglePostWakeSampleProducesNoDelta() {
+        // After a sleep/wake purge, only one sample exists — count < 2 guard fires → normal.
+        let monitor = SwapMonitor()
+        monitor.injectSample(swapBytes: 2 * GB, compressedBytes: 0, at: Date())
+        XCTAssertEqual(monitor.swapState, .normal,
+                       "A single post-wake sample has no delta partner → swapState must be normal")
+    }
+
+    func testNearSpikeThresholdIsNotFiltered() {
+        // A 3.9 GB delta in one interval is below the 4 GB spike threshold → valid, registers as swapCritical.
+        let monitor = SwapMonitor()
+        let now = Date()
+        monitor.injectSample(swapBytes: 100 * MB, compressedBytes: 0, at: now.addingTimeInterval(-30))
+        monitor.injectSample(swapBytes: 4 * GB, compressedBytes: 0, at: now)
+        // 4 GB − 100 MB ≈ 3.9 GB → swapCritical
+        XCTAssertEqual(monitor.swapState, .swapCritical,
+                       "3.9 GB delta is below the 4 GB spike threshold → valid sample → swapCritical")
+    }
 }

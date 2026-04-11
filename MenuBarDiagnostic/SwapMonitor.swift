@@ -42,6 +42,11 @@ class SwapMonitor: ObservableObject {
     private var compressedSamples: [(timestamp: Date, bytes: UInt64)] = []
     private let windowDuration: TimeInterval = 5 * 60  // 5 minutes
 
+    // If the gap since the last sample exceeds this, assume a sleep/wake occurred and purge stale window.
+    private let maxSampleGap: TimeInterval = 90  // 3× the 30s polling interval
+    // Single-sample change exceeding this is treated as a sensor spike and discarded.
+    private let spikeThreshold: UInt64 = 4 * 1_073_741_824  // 4 GB in one interval is physically implausible
+
     private var timer: DispatchSourceTimer?
     private let sampleQueue = DispatchQueue(label: "com.bouncer.swapmonitor", qos: .utility)
 
@@ -146,6 +151,22 @@ class SwapMonitor: ObservableObject {
 
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
+
+            // Sleep/wake guard: if too much time passed since the last sample, the window is
+            // stale (samples were collected before sleep). Purge it so we start fresh.
+            if let lastTimestamp = self.swapSamples.last?.timestamp,
+               now.timeIntervalSince(lastTimestamp) > self.maxSampleGap {
+                self.swapSamples.removeAll()
+                self.compressedSamples.removeAll()
+            }
+
+            // Spike filter: a single-sample jump this large indicates a sensor glitch (e.g.,
+            // the kernel returning a transitional value right after wake). Discard the sample.
+            if let lastSwap = self.swapSamples.last?.bytes,
+               swapUsed > lastSwap, swapUsed - lastSwap > self.spikeThreshold {
+                return
+            }
+
             self.swapSamples.append((timestamp: now, bytes: swapUsed))
             self.compressedSamples.append((timestamp: now, bytes: compressed))
             self.trimWindow()
@@ -174,16 +195,18 @@ class SwapMonitor: ObservableObject {
 
     private func swapDelta() -> UInt64 {
         guard swapSamples.count >= 2 else { return 0 }
-        let oldest = swapSamples.first!.bytes
+        // Use min-in-window rather than oldest to correctly capture growth even when
+        // swap partially releases mid-window before spiking again.
+        let minInWindow = swapSamples.min(by: { $0.bytes < $1.bytes })!.bytes
         let newest = swapSamples.last!.bytes
-        return newest > oldest ? newest - oldest : 0
+        return newest > minInWindow ? newest - minInWindow : 0
     }
 
     private func compressedDelta() -> UInt64 {
         guard compressedSamples.count >= 2 else { return 0 }
-        let oldest = compressedSamples.first!.bytes
+        let minInWindow = compressedSamples.min(by: { $0.bytes < $1.bytes })!.bytes
         let newest = compressedSamples.last!.bytes
-        return newest > oldest ? newest - oldest : 0
+        return newest > minInWindow ? newest - minInWindow : 0
     }
 
     private func refreshSwapState() {
