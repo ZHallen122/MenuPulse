@@ -30,6 +30,14 @@ class ProcessMonitor: ObservableObject {
     /// and cached for the lifetime of the monitor.
     @Published var systemRAMTotalBytes: UInt64 = 0
 
+    /// Bundle IDs currently in a per-app learning period (new app, reset, or returning from stale).
+    /// AnomalyDetector skips these apps. Updated on the main queue on each persist tick.
+    @Published var learningBundleIDs: Set<String> = []
+
+    /// Maps bundleID → appName for apps whose version changed since last seen.
+    /// Accumulates entries over time; HUDView manages dismissal via a local @State var.
+    @Published var recentlyUpdatedApps: [String: String] = [:]
+
     private let prefs: PreferencesManager
     private var timer: Timer?
     let dataStore = DataStore()
@@ -64,6 +72,22 @@ class ProcessMonitor: ObservableObject {
     /// Keeps every access to previousSamples / cpuHistories / memoryHistories
     /// off the main thread and serialised, avoiding data races.
     private let sampleQueue = DispatchQueue(label: "com.bouncer.sampling", qos: .utility)
+
+    // MARK: - Per-app lifecycle cache (accessed only on sampleQueue)
+
+    private struct LifecycleEntry {
+        var state: String
+        var version: String?
+        var learningStartedAt: Date?
+    }
+
+    /// In-memory cache of per-app lifecycle state. Keyed by bundle ID.
+    /// Populated lazily from DataStore on first encounter; updated on each persist tick.
+    private var lifecycleCache: [String: LifecycleEntry] = [:]
+
+    /// Set of bundle IDs in per-app learning — updated on each persist tick and
+    /// passed to AnomalyDetector. Accessed only on sampleQueue.
+    private var currentLearningBundleIDs: Set<String> = []
 
     init(prefs: PreferencesManager = PreferencesManager()) {
         self.prefs = prefs
@@ -108,6 +132,14 @@ class ProcessMonitor: ObservableObject {
         // background-only daemons with `.prohibited` policy).
         let accessoryApps = NSWorkspace.shared.runningApplications.filter {
             $0.activationPolicy != .prohibited
+        }
+
+        // Build bundleID → bundleURL map for version lookups during persist.
+        var bundleURLMap: [String: URL] = [:]
+        for app in accessoryApps {
+            if let bid = app.bundleIdentifier, let url = app.bundleURL {
+                bundleURLMap[bid] = url
+            }
         }
 
         var newProcesses: [MenuBarProcess] = []
@@ -213,14 +245,112 @@ class ProcessMonitor: ObservableObject {
                 dataStore.recomputeBaselines()
             }
             lastPersistTime = Date()
+
+            // --- Per-app lifecycle management (section 6.6) ---
+            let now = Date()
+            let staleCutoff = now.addingTimeInterval(-30 * 24 * 3600)
+            dataStore.markStaleApps(lastSeenCutoff: staleCutoff)
+
+            let learningDuration = prefs.learningPeriodDuration
+            var newUpdatesThisCycle: [String: String] = [:]
+
+            for process in sorted {
+                guard let bundleID = process.bundleIdentifier else { continue }
+
+                // Resolve current version from Info.plist via the running app's bundle.
+                let version: String? = bundleURLMap[bundleID].flatMap { url in
+                    Bundle(url: url)?.infoDictionary?["CFBundleShortVersionString"] as? String
+                }
+
+                if var cached = lifecycleCache[bundleID] {
+                    // App is known to us — check for version change or stale return.
+                    if let newVer = version, let cachedVer = cached.version, newVer != cachedVer {
+                        // Version changed: reset to learning, announce update.
+                        dataStore.resetToLearning(bundleID: bundleID, version: version)
+                        cached = LifecycleEntry(state: "learning", version: version, learningStartedAt: now)
+                        lifecycleCache[bundleID] = cached
+                        newUpdatesThisCycle[bundleID] = process.name
+                    } else if cached.state == "stale" {
+                        // App returning after a long absence: re-enter learning.
+                        dataStore.resetToLearning(bundleID: bundleID, version: version)
+                        cached = LifecycleEntry(state: "learning",
+                                                version: version ?? cached.version,
+                                                learningStartedAt: now)
+                        lifecycleCache[bundleID] = cached
+                    }
+                } else {
+                    // New to cache: query DataStore to see if we've seen this app before.
+                    if let entry = dataStore.lifecycleEntry(for: bundleID) {
+                        if entry.state == "stale" {
+                            // Known but dormant: restart learning.
+                            dataStore.resetToLearning(bundleID: bundleID, version: version)
+                            lifecycleCache[bundleID] = LifecycleEntry(state: "learning",
+                                                                       version: version ?? entry.version,
+                                                                       learningStartedAt: now)
+                        } else {
+                            lifecycleCache[bundleID] = LifecycleEntry(state: entry.state,
+                                                                       version: entry.version,
+                                                                       learningStartedAt: entry.learningStartedAt)
+                        }
+                    } else {
+                        // Brand new app: start learning clock now.
+                        dataStore.resetToLearning(bundleID: bundleID, version: version)
+                        lifecycleCache[bundleID] = LifecycleEntry(state: "learning",
+                                                                   version: version,
+                                                                   learningStartedAt: now)
+                    }
+                }
+
+                // Always persist last_seen_at + current state.
+                let entry = lifecycleCache[bundleID]!
+                dataStore.updateAppLifecycle(bundleID: bundleID,
+                                             state: entry.state,
+                                             version: entry.version ?? version,
+                                             lastSeen: now)
+            }
+
+            // Graduate apps whose learning period has elapsed, then compute the live set.
+            var newLearningSet = Set<String>()
+            for bundleID in lifecycleCache.keys {
+                guard var entry = lifecycleCache[bundleID] else { continue }
+                guard entry.state == "learning" else { continue }
+                let startedAt = entry.learningStartedAt ?? now
+                if now.timeIntervalSince(startedAt) < learningDuration {
+                    newLearningSet.insert(bundleID)
+                } else {
+                    // Learning period elapsed: graduate to active.
+                    entry.state = "active"
+                    lifecycleCache[bundleID] = entry
+                    dataStore.updateAppLifecycle(bundleID: bundleID,
+                                                 state: "active",
+                                                 version: entry.version,
+                                                 lastSeen: now)
+                }
+            }
+            currentLearningBundleIDs = newLearningSet
+
+            // Publish learning set and any new version-change events on the main queue.
+            let capturedLearning = newLearningSet
+            let capturedUpdates = newUpdatesThisCycle
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.learningBundleIDs = capturedLearning
+                if !capturedUpdates.isEmpty {
+                    var merged = self.recentlyUpdatedApps
+                    merged.merge(capturedUpdates) { _, new in new }
+                    self.recentlyUpdatedApps = merged
+                }
+            }
         }
 
         let cpuFrac = sampleSystemCPU()
         let (ramUsed, ramTotal, pressure) = sampleSystemRAM()
 
-        anomalyDetector?.evaluate(processes: sorted, pressure: pressure)
+        anomalyDetector?.evaluate(processes: sorted, pressure: pressure,
+                                   learningBundleIDs: currentLearningBundleIDs)
 
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
             self.processes = sorted
             self.systemCPUFraction = cpuFrac
             self.systemRAMUsedBytes = ramUsed

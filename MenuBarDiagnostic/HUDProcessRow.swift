@@ -5,6 +5,7 @@ struct HUDProcessRow: View {
     let process: MenuBarProcess
     var cpuAlertThreshold: Double = 0.05
     var ramAlertThresholdMB: Double = 200.0
+    var isLearning: Bool = false
 
     @State private var pulse = false
     @State private var showDetail = false
@@ -42,10 +43,17 @@ struct HUDProcessRow: View {
             RAMBarView(bytes: process.memoryFootprintBytes, maxBytes: 500 * 1024 * 1024)
                 .frame(height: 4)
 
-            // RAM label
-            Text(process.memoryString)
-                .font(.caption2.monospacedDigit())
-                .foregroundColor(isHogging ? .white.opacity(0.85) : .secondary)
+            // RAM label + optional per-app learning badge
+            HStack(spacing: 4) {
+                Text(process.memoryString)
+                    .font(.caption2.monospacedDigit())
+                    .foregroundColor(isHogging ? .white.opacity(0.85) : .secondary)
+                if isLearning {
+                    Text("Learning")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

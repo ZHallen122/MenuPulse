@@ -77,6 +77,59 @@ final class DataStore {
         return result
     }
 
+    // MARK: - Lifecycle API (section 6.6)
+
+    /// Returns the lifecycle state for the given bundle ID.
+    /// Defaults to `"learning"` if the app has no recorded entry.
+    func appState(for bundleID: String) -> String {
+        var result = "learning"
+        queue.sync {
+            result = queryAppState(for: bundleID)
+        }
+        return result
+    }
+
+    /// Returns the full lifecycle entry for the given bundle ID, or `nil` if not found.
+    func lifecycleEntry(for bundleID: String) -> (state: String, version: String?, learningStartedAt: Date?)? {
+        var result: (String, String?, Date?)?
+        queue.sync {
+            result = queryLifecycleEntry(for: bundleID)
+        }
+        return result
+    }
+
+    /// Upserts the app_lifecycle row. Updates state, version, and last_seen_at.
+    /// Preserves the existing `learning_started_at` if the row already has one —
+    /// use `resetToLearning` to explicitly restart the learning clock.
+    func updateAppLifecycle(bundleID: String, state: String, version: String?, lastSeen: Date) {
+        queue.async { [weak self] in
+            self?.doUpdateAppLifecycle(bundleID: bundleID, state: state, version: version, lastSeen: lastSeen)
+        }
+    }
+
+    /// Marks all apps last seen before `lastSeenCutoff` whose state is `"active"` as `"stale"`.
+    func markStaleApps(lastSeenCutoff: Date) {
+        queue.async { [weak self] in
+            self?.doMarkStaleApps(lastSeenCutoff: lastSeenCutoff)
+        }
+    }
+
+    /// Resets an app to the `"learning"` state and records now as `learning_started_at`.
+    func resetToLearning(bundleID: String, version: String?) {
+        queue.async { [weak self] in
+            self?.doResetToLearning(bundleID: bundleID, version: version)
+        }
+    }
+
+    /// Returns `true` if the app is in `"learning"` state and `now - learning_started_at < duration`.
+    func isInPerAppLearningPeriod(bundleID: String, duration: TimeInterval) -> Bool {
+        var result = false
+        queue.sync {
+            result = doIsInPerAppLearningPeriod(bundleID: bundleID, duration: duration)
+        }
+        return result
+    }
+
     // MARK: - Private helpers
 
     private func openDatabase() {
@@ -116,11 +169,56 @@ final class DataStore {
                 PRIMARY KEY (bundle_id, date)
             );
             """
+        let appLifecycle = """
+            CREATE TABLE IF NOT EXISTS app_lifecycle (
+                bundle_id TEXT PRIMARY KEY,
+                state TEXT NOT NULL DEFAULT 'learning',
+                version TEXT,
+                learning_started_at INTEGER,
+                last_seen_at INTEGER
+            );
+            """
         if sqlite3_exec(db, memorySamples, nil, nil, nil) != SQLITE_OK {
             NSLog("DataStore: failed to create memory_samples table: %@", String(cString: sqlite3_errmsg(db)))
         }
         if sqlite3_exec(db, dailyBaselines, nil, nil, nil) != SQLITE_OK {
             NSLog("DataStore: failed to create daily_baselines table: %@", String(cString: sqlite3_errmsg(db)))
+        }
+        if sqlite3_exec(db, appLifecycle, nil, nil, nil) != SQLITE_OK {
+            NSLog("DataStore: failed to create app_lifecycle table: %@", String(cString: sqlite3_errmsg(db)))
+        }
+        migrateDailyBaselines()
+    }
+
+    /// Adds `version` and `state` columns to `daily_baselines` if they don't already exist.
+    /// SQLite does not support `ADD COLUMN IF NOT EXISTS`, so we check `PRAGMA table_info` first.
+    private func migrateDailyBaselines() {
+        guard let db = db else { return }
+        var existingColumns = Set<String>()
+        let pragmaSQL = "PRAGMA table_info(daily_baselines);"
+        var pragmaStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, pragmaSQL, -1, &pragmaStmt, nil) == SQLITE_OK {
+            while sqlite3_step(pragmaStmt) == SQLITE_ROW {
+                if let namePtr = sqlite3_column_text(pragmaStmt, 1) {
+                    existingColumns.insert(String(cString: namePtr))
+                }
+            }
+        }
+        sqlite3_finalize(pragmaStmt)
+
+        if !existingColumns.contains("version") {
+            let sql = "ALTER TABLE daily_baselines ADD COLUMN version TEXT;"
+            if sqlite3_exec(db, sql, nil, nil, nil) != SQLITE_OK {
+                NSLog("DataStore: failed to add 'version' column to daily_baselines: %@",
+                      String(cString: sqlite3_errmsg(db)))
+            }
+        }
+        if !existingColumns.contains("state") {
+            let sql = "ALTER TABLE daily_baselines ADD COLUMN state TEXT DEFAULT 'active';"
+            if sqlite3_exec(db, sql, nil, nil, nil) != SQLITE_OK {
+                NSLog("DataStore: failed to add 'state' column to daily_baselines: %@",
+                      String(cString: sqlite3_errmsg(db)))
+            }
         }
     }
 
@@ -298,5 +396,144 @@ final class DataStore {
         }
         guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
         return (sqlite3_column_double(stmt, 0), sqlite3_column_double(stmt, 1))
+    }
+
+    // MARK: - Lifecycle private helpers
+
+    private func queryAppState(for bundleID: String) -> String {
+        guard let db = db else { return "learning" }
+        let sql = "SELECT state FROM app_lifecycle WHERE bundle_id = ?;"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return "learning" }
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil) == SQLITE_OK else { return "learning" }
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return "learning" }
+        guard let ptr = sqlite3_column_text(stmt, 0) else { return "learning" }
+        return String(cString: ptr)
+    }
+
+    private func queryLifecycleEntry(for bundleID: String) -> (state: String, version: String?, learningStartedAt: Date?)? {
+        guard let db = db else { return nil }
+        let sql = "SELECT state, version, learning_started_at FROM app_lifecycle WHERE bundle_id = ?;"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return nil }
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil) == SQLITE_OK else { return nil }
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
+        let state = sqlite3_column_text(stmt, 0).map { String(cString: $0) } ?? "learning"
+        let version: String? = sqlite3_column_type(stmt, 1) != SQLITE_NULL
+            ? sqlite3_column_text(stmt, 1).map { String(cString: $0) }
+            : nil
+        let learningStartedAt: Date? = sqlite3_column_type(stmt, 2) != SQLITE_NULL
+            ? Date(timeIntervalSince1970: Double(sqlite3_column_int64(stmt, 2)))
+            : nil
+        return (state, version, learningStartedAt)
+    }
+
+    /// Upserts last_seen_at and state. Does NOT touch learning_started_at on updates
+    /// (preserving whatever the existing row has). For new row inserts, sets
+    /// learning_started_at to now when state == "learning".
+    private func doUpdateAppLifecycle(bundleID: String, state: String, version: String?, lastSeen: Date) {
+        guard let db = db else { return }
+        let lastSeenTS = Int64(lastSeen.timeIntervalSince1970)
+        let nowTS = Int64(Date().timeIntervalSince1970)
+        // For fresh INSERT: supply learning_started_at=now when state=='learning'.
+        // ON CONFLICT UPDATE: skip learning_started_at so the existing value is preserved.
+        let sql = """
+            INSERT INTO app_lifecycle (bundle_id, state, version, learning_started_at, last_seen_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(bundle_id) DO UPDATE SET
+                state = excluded.state,
+                version = COALESCE(excluded.version, version),
+                last_seen_at = excluded.last_seen_at;
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            NSLog("DataStore: prepare failed in doUpdateAppLifecycle: %@", String(cString: sqlite3_errmsg(db)))
+            return
+        }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil)
+        sqlite3_bind_text(stmt, 2, (state as NSString).utf8String, -1, nil)
+        if let v = version {
+            sqlite3_bind_text(stmt, 3, (v as NSString).utf8String, -1, nil)
+        } else {
+            sqlite3_bind_null(stmt, 3)
+        }
+        if state == "learning" {
+            sqlite3_bind_int64(stmt, 4, nowTS)
+        } else {
+            sqlite3_bind_null(stmt, 4)
+        }
+        sqlite3_bind_int64(stmt, 5, lastSeenTS)
+        let rc = sqlite3_step(stmt)
+        if rc != SQLITE_DONE && rc != SQLITE_ROW {
+            NSLog("DataStore: doUpdateAppLifecycle failed (%d): %@", rc, String(cString: sqlite3_errmsg(db)))
+        }
+    }
+
+    private func doMarkStaleApps(lastSeenCutoff: Date) {
+        guard let db = db else { return }
+        let cutoffTS = Int64(lastSeenCutoff.timeIntervalSince1970)
+        let sql = "UPDATE app_lifecycle SET state = 'stale' WHERE last_seen_at < ? AND state = 'active';"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            NSLog("DataStore: prepare failed in doMarkStaleApps: %@", String(cString: sqlite3_errmsg(db)))
+            return
+        }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_int64(stmt, 1, cutoffTS)
+        let rc = sqlite3_step(stmt)
+        if rc != SQLITE_DONE && rc != SQLITE_ROW {
+            NSLog("DataStore: doMarkStaleApps failed (%d): %@", rc, String(cString: sqlite3_errmsg(db)))
+        }
+    }
+
+    private func doResetToLearning(bundleID: String, version: String?) {
+        guard let db = db else { return }
+        let nowTS = Int64(Date().timeIntervalSince1970)
+        // Upsert: always overwrite state, learning_started_at, and last_seen_at.
+        let sql = """
+            INSERT INTO app_lifecycle (bundle_id, state, version, learning_started_at, last_seen_at)
+            VALUES (?, 'learning', ?, ?, ?)
+            ON CONFLICT(bundle_id) DO UPDATE SET
+                state = 'learning',
+                version = COALESCE(excluded.version, version),
+                learning_started_at = excluded.learning_started_at,
+                last_seen_at = excluded.last_seen_at;
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            NSLog("DataStore: prepare failed in doResetToLearning: %@", String(cString: sqlite3_errmsg(db)))
+            return
+        }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil)
+        if let v = version {
+            sqlite3_bind_text(stmt, 2, (v as NSString).utf8String, -1, nil)
+        } else {
+            sqlite3_bind_null(stmt, 2)
+        }
+        sqlite3_bind_int64(stmt, 3, nowTS)
+        sqlite3_bind_int64(stmt, 4, nowTS)
+        let rc = sqlite3_step(stmt)
+        if rc != SQLITE_DONE && rc != SQLITE_ROW {
+            NSLog("DataStore: doResetToLearning failed (%d): %@", rc, String(cString: sqlite3_errmsg(db)))
+        }
+    }
+
+    private func doIsInPerAppLearningPeriod(bundleID: String, duration: TimeInterval) -> Bool {
+        guard let db = db else { return false }
+        let sql = "SELECT state, learning_started_at FROM app_lifecycle WHERE bundle_id = ?;"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return false }
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil) == SQLITE_OK else { return false }
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return true } // unknown app defaults to learning
+        let state = sqlite3_column_text(stmt, 0).map { String(cString: $0) } ?? "learning"
+        guard state == "learning" else { return false }
+        guard sqlite3_column_type(stmt, 1) != SQLITE_NULL else { return true }
+        let learningStartedAt = Date(timeIntervalSince1970: Double(sqlite3_column_int64(stmt, 1)))
+        return Date().timeIntervalSince(learningStartedAt) < duration
     }
 }

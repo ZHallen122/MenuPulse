@@ -40,7 +40,9 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
 
     /// Evaluate all running processes against the three anomaly conditions.
     /// Called from ProcessMonitor after each DataStore persist tick.
-    func evaluate(processes: [MenuBarProcess], pressure: MemoryPressure) {
+    /// Apps in `learningBundleIDs` are skipped — their baseline is still forming.
+    func evaluate(processes: [MenuBarProcess], pressure: MemoryPressure,
+                  learningBundleIDs: Set<String> = []) {
         // Suppress all anomaly detection and notifications during the 3-day learning period.
         guard !prefs.isInLearningPeriod else {
             anomalyStartDates.removeAll()
@@ -73,7 +75,8 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
 
         for process in processes {
             guard let bundleID = process.bundleIdentifier,
-                  !ignoredIDs.contains(bundleID) else { continue }
+                  !ignoredIDs.contains(bundleID),
+                  !learningBundleIDs.contains(bundleID) else { continue }
 
             liveBundleIDs.insert(bundleID)
 
