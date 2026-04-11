@@ -4,6 +4,16 @@ import Combine
 import UserNotifications
 import ServiceManagement
 
+/// Central application delegate for Bouncer.
+///
+/// Owns the `NSStatusItem` (menu bar icon) and `NSPopover` (process list HUD), and wires
+/// together `ProcessMonitor`, `AnomalyDetector`, and `SwapMonitor`. Responsibilities include:
+/// - Registering `UNUserNotificationCenter` categories (`MEMORY_ANOMALY`, `SWAP_ACTIVE`) and
+///   handling notification responses (Restart Now, Ignore, Quit Top App, View All, Dismiss).
+/// - Driving the icon tint: red (swap rapid growth) → orange (swap active) → yellow (anomalies)
+///   → green (all clear).
+/// - Managing the settings window lifecycle (single-instance, re-use on re-open).
+/// - Applying and observing the launch-at-login preference via `SMAppService`.
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?

@@ -129,17 +129,22 @@ final class DataStore {
         let now = Int64(Date().timeIntervalSince1970)
         let sql = "INSERT INTO memory_samples (pid, bundle_id, app_name, memory_mb, sampled_at) VALUES (?, ?, ?, ?, ?);"
         var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            NSLog("DataStore: sqlite3_prepare_v2 failed in insertSamples: %@", String(cString: sqlite3_errmsg(db)))
+            return
+        }
         defer { sqlite3_finalize(stmt) }
 
         for process in processes {
             let bundleID = process.bundleIdentifier ?? "unknown"
             let memMB = Double(process.memoryFootprintBytes) / 1_048_576.0
-            sqlite3_bind_int(stmt, 1, process.pid)
-            sqlite3_bind_text(stmt, 2, (bundleID as NSString).utf8String, -1, nil)
-            sqlite3_bind_text(stmt, 3, (process.name as NSString).utf8String, -1, nil)
-            sqlite3_bind_double(stmt, 4, memMB)
-            sqlite3_bind_int64(stmt, 5, now)
+            if sqlite3_bind_int(stmt, 1, process.pid) != SQLITE_OK ||
+               sqlite3_bind_text(stmt, 2, (bundleID as NSString).utf8String, -1, nil) != SQLITE_OK ||
+               sqlite3_bind_text(stmt, 3, (process.name as NSString).utf8String, -1, nil) != SQLITE_OK ||
+               sqlite3_bind_double(stmt, 4, memMB) != SQLITE_OK ||
+               sqlite3_bind_int64(stmt, 5, now) != SQLITE_OK {
+                NSLog("DataStore: bind failed in insertSamples: %@", String(cString: sqlite3_errmsg(db)))
+            }
             let rc = sqlite3_step(stmt)
             if rc != SQLITE_DONE && rc != SQLITE_ROW {
                 NSLog("DataStore: insertSamples sqlite3_step failed (%d): %@", rc, String(cString: sqlite3_errmsg(db)))
@@ -153,7 +158,10 @@ final class DataStore {
         let cutoff = Int64(Date().timeIntervalSince1970) - 7 * 86400
         let sql = "DELETE FROM memory_samples WHERE sampled_at < ?;"
         var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            NSLog("DataStore: sqlite3_prepare_v2 failed in deleteStaleSamples: %@", String(cString: sqlite3_errmsg(db)))
+            return
+        }
         defer { sqlite3_finalize(stmt) }
         sqlite3_bind_int64(stmt, 1, cutoff)
         let rc = sqlite3_step(stmt)
@@ -175,9 +183,14 @@ final class DataStore {
             ORDER BY bundle_id, day, memory_mb;
             """
         var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, fetchSQL, -1, &stmt, nil) == SQLITE_OK else { return }
+        guard sqlite3_prepare_v2(db, fetchSQL, -1, &stmt, nil) == SQLITE_OK else {
+            NSLog("DataStore: sqlite3_prepare_v2 failed in rebuildBaselines (fetch): %@", String(cString: sqlite3_errmsg(db)))
+            return
+        }
         defer { sqlite3_finalize(stmt) }
-        sqlite3_bind_int64(stmt, 1, cutoff)
+        if sqlite3_bind_int64(stmt, 1, cutoff) != SQLITE_OK {
+            NSLog("DataStore: bind failed in rebuildBaselines (fetch): %@", String(cString: sqlite3_errmsg(db)))
+        }
 
         // Group rows into [bundleID+date: [Double]]
         var groups: [(bundleID: String, date: String, values: [Double])] = []
@@ -211,7 +224,10 @@ final class DataStore {
         // Upsert computed baselines.
         let upsertSQL = "INSERT OR REPLACE INTO daily_baselines (bundle_id, date, avg_mb, p90_mb) VALUES (?, ?, ?, ?);"
         var uStmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, upsertSQL, -1, &uStmt, nil) == SQLITE_OK else { return }
+        guard sqlite3_prepare_v2(db, upsertSQL, -1, &uStmt, nil) == SQLITE_OK else {
+            NSLog("DataStore: sqlite3_prepare_v2 failed in rebuildBaselines (upsert): %@", String(cString: sqlite3_errmsg(db)))
+            return
+        }
         defer { sqlite3_finalize(uStmt) }
 
         for group in groups {
@@ -219,10 +235,12 @@ final class DataStore {
             let avg = sorted.reduce(0, +) / Double(sorted.count)
             let p90Index = max(0, Int(Double(sorted.count - 1) * 0.9))
             let p90 = sorted[p90Index]
-            sqlite3_bind_text(uStmt, 1, (group.bundleID as NSString).utf8String, -1, nil)
-            sqlite3_bind_text(uStmt, 2, (group.date as NSString).utf8String, -1, nil)
-            sqlite3_bind_double(uStmt, 3, avg)
-            sqlite3_bind_double(uStmt, 4, p90)
+            if sqlite3_bind_text(uStmt, 1, (group.bundleID as NSString).utf8String, -1, nil) != SQLITE_OK ||
+               sqlite3_bind_text(uStmt, 2, (group.date as NSString).utf8String, -1, nil) != SQLITE_OK ||
+               sqlite3_bind_double(uStmt, 3, avg) != SQLITE_OK ||
+               sqlite3_bind_double(uStmt, 4, p90) != SQLITE_OK {
+                NSLog("DataStore: bind failed in rebuildBaselines (upsert): %@", String(cString: sqlite3_errmsg(db)))
+            }
             let urc = sqlite3_step(uStmt)
             if urc != SQLITE_DONE && urc != SQLITE_ROW {
                 NSLog("DataStore: rebuildBaselines upsert failed (%d): %@", urc, String(cString: sqlite3_errmsg(db)))
@@ -236,10 +254,15 @@ final class DataStore {
         let cutoff = Int64(since.timeIntervalSince1970)
         let sql = "SELECT memory_mb, sampled_at FROM memory_samples WHERE bundle_id = ? AND sampled_at >= ? ORDER BY sampled_at ASC;"
         var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            NSLog("DataStore: sqlite3_prepare_v2 failed in queryRecentSamples: %@", String(cString: sqlite3_errmsg(db)))
+            return []
+        }
         defer { sqlite3_finalize(stmt) }
-        sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil)
-        sqlite3_bind_int64(stmt, 2, cutoff)
+        if sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil) != SQLITE_OK ||
+           sqlite3_bind_int64(stmt, 2, cutoff) != SQLITE_OK {
+            NSLog("DataStore: bind failed in queryRecentSamples: %@", String(cString: sqlite3_errmsg(db)))
+        }
         var rows: [(memoryMB: Double, timestamp: Date)] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
             let memMB = sqlite3_column_double(stmt, 0)
@@ -253,9 +276,14 @@ final class DataStore {
         guard let db = db else { return nil }
         let sql = "SELECT avg_mb, p90_mb FROM daily_baselines WHERE bundle_id = ? ORDER BY date DESC LIMIT 1;"
         var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return nil }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            NSLog("DataStore: sqlite3_prepare_v2 failed in queryBaseline: %@", String(cString: sqlite3_errmsg(db)))
+            return nil
+        }
         defer { sqlite3_finalize(stmt) }
-        sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil)
+        if sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil) != SQLITE_OK {
+            NSLog("DataStore: bind failed in queryBaseline: %@", String(cString: sqlite3_errmsg(db)))
+        }
         guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
         return (sqlite3_column_double(stmt, 0), sqlite3_column_double(stmt, 1))
     }

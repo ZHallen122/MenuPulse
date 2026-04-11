@@ -3,12 +3,22 @@ import Combine
 import UserNotifications
 import Darwin
 
+/// Represents the current swap memory activity level on the system.
 enum SwapState: Equatable {
+    /// No swap space is in use; the system is operating entirely from RAM.
     case none
+    /// Swap is in use but growing slowly or not at all.
     case active
+    /// Swap is growing faster than ~167 KB/s (~10 MB/min), indicating significant memory pressure.
     case rapidGrowth
 }
 
+/// Monitors system swap memory usage by polling `vm.swapusage` every 30 seconds.
+///
+/// Publishes `swapUsedBytes`, `swapTotalBytes`, `swapGrowthBytesPerSec`, and the derived
+/// `swapState` (`SwapState`). When swap transitions from inactive (0 bytes used) to active,
+/// `SwapMonitor` posts a `UNUserNotification` in the `SWAP_ACTIVE` category — offering
+/// **Quit Top App**, **View All**, and **Dismiss** actions — subject to a 1-hour cooldown.
 class SwapMonitor: ObservableObject {
     @Published var swapUsedBytes: UInt64 = 0 {
         didSet { refreshSwapState() }
@@ -72,7 +82,11 @@ class SwapMonitor: ObservableObject {
                 content: content,
                 trigger: nil
             )
-            UNUserNotificationCenter.current().add(request)
+            UNUserNotificationCenter.current().add(request) { error in
+                if let error = error {
+                    NSLog("SwapMonitor: failed to schedule notification: %@", error.localizedDescription)
+                }
+            }
         }
         return true
     }
