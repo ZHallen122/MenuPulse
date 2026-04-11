@@ -83,6 +83,8 @@ ProcessMonitor  ──samples every 2s──►  AnomalyDetector
 | `MemoryPressure.swift` | System memory pressure reading utilities |
 | `ProcessDetailSheet.swift` | Expanded detail sheet for a single process |
 | `ThermalState+Display.swift` | Extension adding display strings to `ProcessInfo.ThermalState` |
+| `IconColorLogic.swift` | Pure `iconColor()` function; maps `SwapState` + `pendingAnomalyAlert` → `NSColor` for the status bar icon |
+| `SwapMonitor.swift` | `ObservableObject` that polls `vm.swapusage` every 30 s; publishes swap stats and `SwapState`; posts swap-active notification |
 | `SparklineView.swift` | `Canvas`-based rolling memory sparkline |
 | `PreferencesManager.swift` | `ObservableObject` wrapping `@AppStorage` user preferences |
 | `SettingsView.swift` | SwiftUI settings UI (ignore list, sensitivity, launch at login) |
