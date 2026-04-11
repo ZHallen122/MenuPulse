@@ -200,10 +200,18 @@ class ProcessMonitor: ObservableObject {
 
         let sorted = newProcesses.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
 
-        if Date().timeIntervalSince(lastPersistTime) >= 30 {
+        // Persist every 5 s in testing mode (vs 30 s normally) so there are enough
+        // data points in the 2-minute trending window used by AnomalyDetector.
+        let persistInterval: TimeInterval = prefs.testingMode ? 5 : 30
+        if Date().timeIntervalSince(lastPersistTime) >= persistInterval {
             dataStore.persistSamples(sorted)
             dataStore.purgeOldSamples()
-            dataStore.recomputeBaselines()
+            // Skip baseline recomputation in testing mode so the baseline stays frozen
+            // at pre-test levels; otherwise the baseline chases the spike and the
+            // anomaly multiplier threshold is never reached.
+            if !prefs.testingMode {
+                dataStore.recomputeBaselines()
+            }
             lastPersistTime = Date()
         }
 

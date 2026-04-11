@@ -63,8 +63,9 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
         let ignoredIDs = Set(prefs.ignoredBundleIDs)
         let multiplier = prefs.sensitivity.anomalyMultiplier
         let now = Date()
-        // Collapse the trending window to 30 s in testing mode (normally 30 min).
-        let trendingWindow: TimeInterval = testing ? -30 : -30 * 60
+        // In testing mode: samples persist every 5 s, so use a 2-minute window to
+        // accumulate enough data points for a meaningful trend (normally 30 min).
+        let trendingWindow: TimeInterval = testing ? -2 * 60 : -30 * 60
         let thirtyMinutesAgo = now.addingTimeInterval(trendingWindow)
 
         var liveBundleIDs = Set<String>()
