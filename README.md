@@ -94,7 +94,7 @@ ProcessMonitor  ──samples every 2s──►  AnomalyDetector
 
 1. Clone the repository and open the project:
    ```bash
-   git clone <repo-url>
+   git clone https://github.com/your-org/menu-bar-diagnostic
    cd Menu-Bar-Diagnostic
    open "Menu Bar Diagnostic.xcodeproj"
    ```
