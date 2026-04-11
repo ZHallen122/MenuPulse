@@ -31,7 +31,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "stethoscope", accessibilityDescription: "Bouncer")
+            if let icon = NSImage(systemSymbolName: "stethoscope", accessibilityDescription: "Bouncer") {
+                button.image = icon
+            } else {
+                NSLog("Bouncer: stethoscope system symbol unavailable; falling back to app icon")
+                button.image = NSImage(named: NSImage.applicationIconName)
+            }
             button.imagePosition = .imageLeft
             button.action = #selector(handleStatusBarClick(_:))
             button.target = self
