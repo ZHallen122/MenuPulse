@@ -4,14 +4,18 @@ import Combine
 import UserNotifications
 import ServiceManagement
 
+extension Notification.Name {
+    static let testColorOverride = Notification.Name("TestColorOverride")
+}
+
 /// Central application delegate for Bouncer.
 ///
 /// Owns the `NSStatusItem` (menu bar icon) and `NSPopover` (process list HUD), and wires
 /// together `ProcessMonitor`, `AnomalyDetector`, and `SwapMonitor`. Responsibilities include:
 /// - Registering `UNUserNotificationCenter` categories (`MEMORY_ANOMALY`, `SWAP_ACTIVE`) and
 ///   handling notification responses (Restart Now, Ignore, Quit Top App, View All, Dismiss).
-/// - Driving the icon tint: red (swap rapid growth) → orange (swap active) → yellow (anomalies)
-///   → green (all clear).
+/// - Driving the icon tint: red (swap rapid growth) → orange (swap active or unacknowledged
+///   anomaly alert) → green (all clear).
 /// - Managing the settings window lifecycle (single-instance, re-use on re-open).
 /// - Applying and observing the launch-at-login preference via `SMAppService`.
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -20,6 +24,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var hudWindow: HUDWindow?
     private var settingsWindow: NSWindow?
     private var cancellables = Set<AnyCancellable>()
+    private(set) var pendingAnomalyAlert = false
+    private var testIconColor: String = "normal"
+    private lazy var baseIcon: NSImage = {
+        if let img = NSImage(systemSymbolName: "stethoscope", accessibilityDescription: "Bouncer") { return img }
+        NSLog("Bouncer: stethoscope system symbol unavailable; falling back to app icon")
+        return NSImage(named: NSImage.applicationIconName) ?? NSImage()
+    }()
 
     let prefs = PreferencesManager()
     lazy var monitor: ProcessMonitor = ProcessMonitor(prefs: prefs)
@@ -30,7 +41,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "stethoscope", accessibilityDescription: "Bouncer")
+            button.image = baseIcon
             button.imagePosition = .imageLeft
             button.action = #selector(handleStatusBarClick(_:))
             button.target = self
@@ -68,17 +79,45 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &cancellables)
 
-        // Update icon tint: Red (swap rapid growth) > Orange (swap active) > Yellow (anomalies) > Green.
+        // Reset test icon override when Testing Mode is turned off so the picker stays in sync.
+        NotificationCenter.default
+            .publisher(for: UserDefaults.didChangeNotification)
+            .map { _ in UserDefaults.standard.bool(forKey: "testingMode") }
+            .removeDuplicates()
+            .filter { !$0 }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.testIconColor = "normal"
+                self?.updateIconTint()
+            }
+            .store(in: &cancellables)
+
         Publishers.CombineLatest(swapMonitor.$swapState, anomalyDetector.$anomalousBundleIDs)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] swapState, anomalousBundleIDs in
-                let color: NSColor
-                switch swapState {
-                case .rapidGrowth: color = .systemRed
-                case .active:      color = .systemOrange
-                case .none:        color = anomalousBundleIDs.isEmpty ? .systemGreen : .systemYellow
+            .sink { [weak self] _, anomalousBundleIDs in
+                guard let self else { return }
+                if !anomalousBundleIDs.isEmpty {
+                    self.pendingAnomalyAlert = true
+                } else {
+                    self.pendingAnomalyAlert = false
                 }
-                self?.statusItem?.button?.contentTintColor = color
+                self.updateIconTint()
+            }
+            .store(in: &cancellables)
+
+        NotificationCenter.default
+            .publisher(for: UserDefaults.didChangeNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateIconTint() }
+            .store(in: &cancellables)
+
+        NotificationCenter.default
+            .publisher(for: .testColorOverride)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                guard let self, self.prefs.testingMode, let color = notification.object as? String else { return }
+                self.testIconColor = color
+                self.updateIconTint()
             }
             .store(in: &cancellables)
     }
@@ -205,8 +244,39 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if popover.isShown {
             popover.performClose(sender)
         } else {
+            pendingAnomalyAlert = false
+            updateIconTint()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
+        }
+    }
+
+    private func updateIconTint() {
+        let color: NSColor
+        if prefs.testingMode {
+            if testIconColor == "red" {
+                color = .systemRed
+            } else if testIconColor == "orange" {
+                color = .systemOrange
+            } else {
+                color = iconColor(swapState: swapMonitor.swapState, pendingAnomalyAlert: pendingAnomalyAlert)
+            }
+        } else {
+            color = iconColor(swapState: swapMonitor.swapState, pendingAnomalyAlert: pendingAnomalyAlert)
+        }
+
+        if color == .systemGreen {
+            baseIcon.isTemplate = true
+            statusItem?.button?.image = baseIcon
+        } else {
+            let config = NSImage.SymbolConfiguration(paletteColors: [color])
+            if let tintedIcon = baseIcon.withSymbolConfiguration(config) {
+                tintedIcon.isTemplate = false
+                statusItem?.button?.image = tintedIcon
+            } else {
+                baseIcon.isTemplate = false
+                statusItem?.button?.image = baseIcon
+            }
         }
     }
 

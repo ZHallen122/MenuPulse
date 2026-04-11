@@ -17,7 +17,7 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
     private let prefs: PreferencesManager
 
     /// Bundle IDs where all 3 anomaly conditions are currently met.
-    /// Updated every evaluate() call; drives amber highlighting in StatusMenuView.
+    /// Updated every evaluate() call; drives orange icon tint and highlighting in StatusMenuView.
     @Published var anomalousBundleIDs: Set<String> = []
 
     /// Tracks when each bundle ID first entered an anomalous state (all 3 conditions met).
@@ -101,7 +101,7 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
             if anomalyStartDates[bundleID] == nil {
                 anomalyStartDates[bundleID] = now
             }
-            let anomalyStart = anomalyStartDates[bundleID]!
+            guard let anomalyStart = anomalyStartDates[bundleID] else { continue }
 
             // Must be anomalous for 10 consecutive minutes (or 10 s in testing mode).
             let anomalyDurationGate: TimeInterval = testing ? 10 : 10 * 60

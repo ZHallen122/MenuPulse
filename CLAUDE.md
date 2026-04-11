@@ -41,8 +41,9 @@ It wires `AppDelegate` via `@NSApplicationDelegateAdaptor`; `AppDelegate` owns t
 | Layer | Files |
 |---|---|
 | Entry / lifecycle | `MenuBarDiagnosticApp.swift`, `AppDelegate.swift` |
-| Sampling | `ProcessMonitor.swift`, `MemoryPressure.swift` |
+| Sampling | `ProcessMonitor.swift`, `MemoryPressure.swift`, `SwapMonitor.swift` |
 | Detection | `AnomalyDetector.swift` |
+| Icon coloring | `IconColorLogic.swift` |
 | Storage | `DataStore.swift` (SQLite) |
 | HUD UI | `HUDView.swift`, `HUDWindow.swift`, `HUDProcessRow.swift`, `ThermalHeaderView.swift`, `RAMBarView.swift`, `ProcessDetailSheet.swift` |
 | Settings | `PreferencesManager.swift`, `SettingsView.swift` |

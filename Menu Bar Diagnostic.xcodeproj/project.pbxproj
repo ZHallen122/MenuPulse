@@ -34,6 +34,8 @@
 		CC0000000000000000000004 /* MemoryPressure.swift in TestSources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000005F /* MemoryPressure.swift */; };
 		CC0000000000000000000005 /* PreferencesManager.swift in TestSources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000040 /* PreferencesManager.swift */; };
 		CC0000000000000000000006 /* SwapMonitor.swift in TestSources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000063 /* SwapMonitor.swift */; };
+		DD0000000000000000000001 /* IconColorLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0000000000000000000002 /* IconColorLogic.swift */; };
+		DD0000000000000000000003 /* IconColorLogic.swift in TestSources */ = {isa = PBXBuildFile; fileRef = DD0000000000000000000002 /* IconColorLogic.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -58,6 +60,7 @@
 		AA000000000000000000005F /* MemoryPressure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryPressure.swift; sourceTree = "<group>"; };
 		AA0000000000000000000061 /* AnomalyDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnomalyDetector.swift; sourceTree = "<group>"; };
 		AA0000000000000000000063 /* SwapMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwapMonitor.swift; sourceTree = "<group>"; };
+		DD0000000000000000000002 /* IconColorLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconColorLogic.swift; sourceTree = "<group>"; };
 		BB0000000000000000000001 /* MenuBarDiagnosticTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MenuBarDiagnosticTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB0000000000000000000009 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
 		BB000000000000000000000B /* MenuBarDiagnosticTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarDiagnosticTests.swift; sourceTree = "<group>"; };
@@ -122,6 +125,7 @@
 				AA000000000000000000005F /* MemoryPressure.swift */,
 				AA0000000000000000000061 /* AnomalyDetector.swift */,
 				AA0000000000000000000063 /* SwapMonitor.swift */,
+				DD0000000000000000000002 /* IconColorLogic.swift */,
 				AA0000000000000000000010 /* Info.plist */,
 			);
 			path = MenuBarDiagnostic;
@@ -250,6 +254,7 @@
 				AA0000000000000000000060 /* MemoryPressure.swift in Sources */,
 				AA0000000000000000000062 /* AnomalyDetector.swift in Sources */,
 				AA0000000000000000000064 /* SwapMonitor.swift in Sources */,
+				DD0000000000000000000001 /* IconColorLogic.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -264,6 +269,7 @@
 				CC0000000000000000000004 /* MemoryPressure.swift in TestSources */,
 				CC0000000000000000000005 /* PreferencesManager.swift in TestSources */,
 				CC0000000000000000000006 /* SwapMonitor.swift in TestSources */,
+				DD0000000000000000000003 /* IconColorLogic.swift in TestSources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

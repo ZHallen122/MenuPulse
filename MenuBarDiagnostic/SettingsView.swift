@@ -7,6 +7,7 @@ struct SettingsView: View {
     // Ticks every second so the learning-period countdown stays live.
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     @State private var now = Date()
+    @State private var localTestColor: String = "normal"
 
     var body: some View {
         Form {
@@ -56,6 +57,15 @@ struct SettingsView: View {
                     Button("Fire Test Alert Now") {
                         anomalyDetector.fireTestAlert()
                     }
+                    Picker("Test Icon Color", selection: $localTestColor) {
+                        Text("Default").tag("normal")
+                        Text("Orange").tag("orange")
+                        Text("Red").tag("red")
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: localTestColor) { newColor in
+                        NotificationCenter.default.post(name: .testColorOverride, object: newColor)
+                    }
                 }
                 Button("Reset Learning Period") {
                     prefs.resetLearningPeriod()
@@ -70,7 +80,7 @@ struct SettingsView: View {
             }
         }
         .padding(20)
-        .frame(width: 420, height: prefs.testingMode ? 480 : 450)
+        .frame(width: 420, height: prefs.testingMode ? 520 : 450)
         .onReceive(timer) { tick in
             now = tick
         }

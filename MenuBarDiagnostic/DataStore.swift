@@ -144,6 +144,9 @@ final class DataStore {
                sqlite3_bind_double(stmt, 4, memMB) != SQLITE_OK ||
                sqlite3_bind_int64(stmt, 5, now) != SQLITE_OK {
                 NSLog("DataStore: bind failed in insertSamples: %@", String(cString: sqlite3_errmsg(db)))
+                sqlite3_reset(stmt)
+                sqlite3_clear_bindings(stmt)
+                continue
             }
             let rc = sqlite3_step(stmt)
             if rc != SQLITE_DONE && rc != SQLITE_ROW {
@@ -163,7 +166,10 @@ final class DataStore {
             return
         }
         defer { sqlite3_finalize(stmt) }
-        sqlite3_bind_int64(stmt, 1, cutoff)
+        if sqlite3_bind_int64(stmt, 1, cutoff) != SQLITE_OK {
+            NSLog("DataStore: bind failed in deleteStaleSamples: %@", String(cString: sqlite3_errmsg(db)))
+            return
+        }
         let rc = sqlite3_step(stmt)
         if rc != SQLITE_DONE && rc != SQLITE_ROW {
             NSLog("DataStore: deleteStaleSamples sqlite3_step failed (%d): %@", rc, String(cString: sqlite3_errmsg(db)))
@@ -190,6 +196,7 @@ final class DataStore {
         defer { sqlite3_finalize(stmt) }
         if sqlite3_bind_int64(stmt, 1, cutoff) != SQLITE_OK {
             NSLog("DataStore: bind failed in rebuildBaselines (fetch): %@", String(cString: sqlite3_errmsg(db)))
+            return
         }
 
         // Group rows into [bundleID+date: [Double]]
@@ -240,6 +247,9 @@ final class DataStore {
                sqlite3_bind_double(uStmt, 3, avg) != SQLITE_OK ||
                sqlite3_bind_double(uStmt, 4, p90) != SQLITE_OK {
                 NSLog("DataStore: bind failed in rebuildBaselines (upsert): %@", String(cString: sqlite3_errmsg(db)))
+                sqlite3_reset(uStmt)
+                sqlite3_clear_bindings(uStmt)
+                continue
             }
             let urc = sqlite3_step(uStmt)
             if urc != SQLITE_DONE && urc != SQLITE_ROW {
@@ -262,6 +272,7 @@ final class DataStore {
         if sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil) != SQLITE_OK ||
            sqlite3_bind_int64(stmt, 2, cutoff) != SQLITE_OK {
             NSLog("DataStore: bind failed in queryRecentSamples: %@", String(cString: sqlite3_errmsg(db)))
+            return []
         }
         var rows: [(memoryMB: Double, timestamp: Date)] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
@@ -283,6 +294,7 @@ final class DataStore {
         defer { sqlite3_finalize(stmt) }
         if sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil) != SQLITE_OK {
             NSLog("DataStore: bind failed in queryBaseline: %@", String(cString: sqlite3_errmsg(db)))
+            return nil
         }
         guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
         return (sqlite3_column_double(stmt, 0), sqlite3_column_double(stmt, 1))
