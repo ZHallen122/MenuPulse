@@ -98,6 +98,8 @@ class PreferencesManager: ObservableObject {
     /// anomaly detection can be exercised without waiting.
     @AppStorage("testingMode") var testingMode: Bool = false
 
+    @AppStorage("automaticUpdateChecks") var automaticUpdateChecks: Bool = true
+
     /// Parsed list of ignored bundle identifiers.
     var ignoredBundleIDs: [String] {
         get {

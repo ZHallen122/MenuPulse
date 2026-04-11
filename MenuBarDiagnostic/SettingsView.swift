@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var prefs: PreferencesManager
     var anomalyDetector: AnomalyDetector
+    var onCheckForUpdates: (() -> Void)? = nil
 
     // Ticks every second so the learning-period countdown stays live.
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -37,6 +38,10 @@ struct SettingsView: View {
 
             Section {
                 Toggle("Launch at Login", isOn: $prefs.launchAtLogin)
+                Toggle("Automatically Check for Updates", isOn: $prefs.automaticUpdateChecks)
+                Button("Check for Updates Now") {
+                    onCheckForUpdates?()
+                }
             } header: {
                 Text("System")
             } footer: {
