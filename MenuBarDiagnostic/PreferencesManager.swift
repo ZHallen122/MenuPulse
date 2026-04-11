@@ -64,9 +64,16 @@ class PreferencesManager: ObservableObject {
     }
 
     /// True during the 3-day baseline learning period after first launch.
+    /// Always returns false when testingMode is enabled.
     var isInLearningPeriod: Bool {
-        Date().timeIntervalSince(firstLaunchDate) < 3 * 86400
+        guard !testingMode else { return false }
+        return Date().timeIntervalSince(firstLaunchDate) < 3 * 86400
     }
+
+    /// When true, bypasses the learning period, memory pressure guard, and collapses
+    /// the 30-min trending window / 10-min anomaly-duration gate to 30 s / 10 s so
+    /// anomaly detection can be exercised without waiting.
+    @AppStorage("testingMode") var testingMode: Bool = false
 
     /// Parsed list of ignored bundle identifiers.
     var ignoredBundleIDs: [String] {

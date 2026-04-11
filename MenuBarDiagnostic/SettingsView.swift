@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var prefs: PreferencesManager
+    var anomalyDetector: AnomalyDetector
 
     var body: some View {
         Form {
@@ -44,8 +45,24 @@ struct SettingsView: View {
                 Text("Displays RAM usage % next to the menu bar icon.")
                     .foregroundColor(.secondary)
             }
+
+            Section {
+                Toggle("Testing Mode", isOn: $prefs.testingMode)
+                if prefs.testingMode {
+                    Button("Fire Test Alert Now") {
+                        anomalyDetector.fireTestAlert()
+                    }
+                }
+            } header: {
+                Text("Developer")
+            } footer: {
+                Text(prefs.testingMode
+                     ? "Learning period and memory pressure guard are bypassed. Time windows collapsed to seconds. \"Fire Test Alert Now\" sends a synthetic notification immediately."
+                     : "Enable to exercise alert detection without the 3-day learning period or real memory pressure.")
+                    .foregroundColor(.secondary)
+            }
         }
         .padding(20)
-        .frame(width: 420, height: 360)
+        .frame(width: 420, height: prefs.testingMode ? 430 : 400)
     }
 }

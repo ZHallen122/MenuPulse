@@ -170,7 +170,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.activate(ignoringOtherApps: true)
             return
         }
-        let vc = NSHostingController(rootView: SettingsView(prefs: prefs))
+        let vc = NSHostingController(rootView: SettingsView(prefs: prefs, anomalyDetector: anomalyDetector))
         let win = NSWindow(contentViewController: vc)
         win.title = "Bouncer Settings"
         win.styleMask = [.titled, .closable, .resizable, .miniaturizable]
