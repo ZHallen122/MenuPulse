@@ -226,17 +226,10 @@ final class DataStore {
         }
         sqlite3_finalize(pragmaStmt)
 
-        if !existingColumns.contains("version") {
-            let sql = "ALTER TABLE daily_baselines ADD COLUMN version TEXT;"
+        if !existingColumns.contains("median_mb") {
+            let sql = "ALTER TABLE daily_baselines ADD COLUMN median_mb REAL;"
             if sqlite3_exec(db, sql, nil, nil, nil) != SQLITE_OK {
-                NSLog("DataStore: failed to add 'version' column to daily_baselines: %@",
-                      String(cString: sqlite3_errmsg(db)))
-            }
-        }
-        if !existingColumns.contains("state") {
-            let sql = "ALTER TABLE daily_baselines ADD COLUMN state TEXT DEFAULT 'active';"
-            if sqlite3_exec(db, sql, nil, nil, nil) != SQLITE_OK {
-                NSLog("DataStore: failed to add 'state' column to daily_baselines: %@",
+                NSLog("DataStore: failed to add 'median_mb' column to daily_baselines: %@",
                       String(cString: sqlite3_errmsg(db)))
             }
         }
@@ -605,14 +598,17 @@ final class DataStore {
         guard let db = db else { return }
         let nowTS = Int64(Date().timeIntervalSince1970)
         // Upsert: always overwrite state, learning_started_at, and last_seen_at.
+        // Explicitly set sample_count = 0 so the minimum-sample guard correctly silences notifications
+        // during the first 15 minutes of the new version or return from stale.
         let sql = """
-            INSERT INTO app_lifecycle (bundle_id, state, version, learning_started_at, last_seen_at)
-            VALUES (?, 'learning_phase_1', ?, ?, ?)
+            INSERT INTO app_lifecycle (bundle_id, state, version, learning_started_at, last_seen_at, sample_count)
+            VALUES (?, 'learning_phase_1', ?, ?, ?, 0)
             ON CONFLICT(bundle_id) DO UPDATE SET
                 state = 'learning_phase_1',
                 version = COALESCE(excluded.version, version),
                 learning_started_at = excluded.learning_started_at,
-                last_seen_at = excluded.last_seen_at;
+                last_seen_at = excluded.last_seen_at,
+                sample_count = 0;
             """
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
@@ -631,6 +627,24 @@ final class DataStore {
         let rc = sqlite3_step(stmt)
         if rc != SQLITE_DONE && rc != SQLITE_ROW {
             NSLog("DataStore: doResetToLearning failed (%d): %@", rc, String(cString: sqlite3_errmsg(db)))
+        }
+
+        // Purge historical samples and baselines to prevent data pollution.
+        // A version update or a stale return means the old memory profile is no longer valid.
+        let delSamplesSQL = "DELETE FROM memory_samples WHERE bundle_id = ?;"
+        var delSamplesStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, delSamplesSQL, -1, &delSamplesStmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(delSamplesStmt, 1, (bundleID as NSString).utf8String, -1, nil)
+            sqlite3_step(delSamplesStmt)
+            sqlite3_finalize(delSamplesStmt)
+        }
+
+        let delBaselinesSQL = "DELETE FROM daily_baselines WHERE bundle_id = ?;"
+        var delBaselinesStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, delBaselinesSQL, -1, &delBaselinesStmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(delBaselinesStmt, 1, (bundleID as NSString).utf8String, -1, nil)
+            sqlite3_step(delBaselinesStmt)
+            sqlite3_finalize(delBaselinesStmt)
         }
     }
 
