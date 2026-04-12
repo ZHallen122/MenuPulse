@@ -268,6 +268,10 @@ class ProcessMonitor: ObservableObject {
                 }
 
                 if var cached = lifecycleCache[bundleID] {
+                    // Update cache timestamp for all running apps so they aren't evicted while active
+                    cached.lastSeen = now
+                    lifecycleCache[bundleID] = cached
+
                     // App is known to us — check for version change or stale return.
                     // Ignored apps are exempt from all automatic state transitions:
                     // a user-curated ignore list must not be silently cleared by an update or dormancy.
