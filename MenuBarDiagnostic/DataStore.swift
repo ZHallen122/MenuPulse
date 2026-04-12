@@ -90,9 +90,9 @@ final class DataStore {
     // MARK: - Lifecycle API (section 6.6)
 
     /// Returns the lifecycle state for the given bundle ID.
-    /// Defaults to `"learning"` if the app has no recorded entry.
+    /// Defaults to `"learning_phase_1"` if the app has no recorded entry.
     func appState(for bundleID: String) -> String {
-        var result = "learning"
+        var result = "learning_phase_1"
         queue.sync {
             result = queryAppState(for: bundleID)
         }
@@ -489,14 +489,14 @@ final class DataStore {
     // MARK: - Lifecycle private helpers
 
     private func queryAppState(for bundleID: String) -> String {
-        guard let db = db else { return "learning" }
+        guard let db = db else { return "learning_phase_1" }
         let sql = "SELECT state FROM app_lifecycle WHERE bundle_id = ?;"
         var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return "learning" }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return "learning_phase_1" }
         defer { sqlite3_finalize(stmt) }
-        guard sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil) == SQLITE_OK else { return "learning" }
-        guard sqlite3_step(stmt) == SQLITE_ROW else { return "learning" }
-        guard let ptr = sqlite3_column_text(stmt, 0) else { return "learning" }
+        guard sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil) == SQLITE_OK else { return "learning_phase_1" }
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return "learning_phase_1" }
+        guard let ptr = sqlite3_column_text(stmt, 0) else { return "learning_phase_1" }
         return String(cString: ptr)
     }
 
@@ -508,7 +508,7 @@ final class DataStore {
         defer { sqlite3_finalize(stmt) }
         guard sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil) == SQLITE_OK else { return nil }
         guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
-        let state = sqlite3_column_text(stmt, 0).map { String(cString: $0) } ?? "learning"
+        let state = sqlite3_column_text(stmt, 0).map { String(cString: $0) } ?? "learning_phase_1"
         let version: String? = sqlite3_column_type(stmt, 1) != SQLITE_NULL
             ? sqlite3_column_text(stmt, 1).map { String(cString: $0) }
             : nil

@@ -295,36 +295,44 @@ final class MenuBarDiagnosticTests: XCTestCase {
         XCTAssertTrue(detector.anomalousBundleIDs.contains(bundleID))
     }
 
-    // MARK: - AnomalyDetector: learning period suppresses anomalies
+    // MARK: - AnomalyDetector: phase_1 below 30 samples suppresses notification but not icon tint
 
-    func testLearningPeriodSuppressesAnomalies() {
-        // Simulate a just-launched app (learning period active)
-        UserDefaults.standard.set(Date(), forKey: "firstLaunchDate")
-
+    func testPhase1Under30SamplesNoNotification() {
         let store = DataStore(path: ":memory:")
         Thread.sleep(forTimeInterval: 0.1)
 
-        let bundleID = "com.test.Learning"
-        let baseProcs = (1...10).map { i in
-            makeProcess(bundleID: bundleID, memoryMB: 50, pid: Int32(i))
+        let bundleID = "com.test.Phase1Under30"
+
+        // 3 calls to persistSamples at 100 MB → sample_count = 3, median = 100 MB
+        for i in 0..<3 {
+            store.persistSamples([makeProcess(bundleID: bundleID, memoryMB: 100, pid: Int32(6000 + i))])
+            Thread.sleep(forTimeInterval: 0.05)
         }
-        store.persistSamples(baseProcs)
         Thread.sleep(forTimeInterval: 0.1)
         store.recomputeBaselines()
         Thread.sleep(forTimeInterval: 0.1)
 
+        // Two trend samples 1s apart → positive slope (sample_count → 5, still below 30)
+        store.persistSamples([makeProcess(bundleID: bundleID, memoryMB: 100, pid: 6100)])
+        Thread.sleep(forTimeInterval: 1.1)
+        store.persistSamples([makeProcess(bundleID: bundleID, memoryMB: 200, pid: 6101)])
+        Thread.sleep(forTimeInterval: 0.1)
+
         let detector = AnomalyDetector(dataStore: store, prefs: PreferencesManager())
-        // Pre-seed as if anomaly started 11 minutes ago
+        // Pre-seed anomalyStartDate to satisfy 10-min persistence gate
         detector.anomalyStartDates[bundleID] = Date().addingTimeInterval(-11 * 60)
 
-        detector.evaluate(processes: [makeProcess(bundleID: bundleID, memoryMB: 300)],
-                          pressure: .warning)
+        // 450 MB > median(100) × 4.0 = 400 MB (condition 1 ✓); positive slope (condition 2 ✓); .warning (condition 3 ✓)
+        // sample_count = 5 < 30 → notification suppressed, but icon tint must fire
+        detector.evaluate(processes: [makeProcess(bundleID: bundleID, memoryMB: 450)],
+                          pressure: .warning,
+                          bundleIDPhases: [bundleID: "learning_phase_1"])
 
         RunLoop.main.run(until: Date().addingTimeInterval(0.05))
-        XCTAssertTrue(detector.anomalousBundleIDs.isEmpty,
-                      "learning period must suppress all anomaly detection")
-        XCTAssertTrue(detector.anomalyStartDates.isEmpty,
-                      "evaluate() must clear anomalyStartDates during learning period")
+        XCTAssertTrue(detector.anomalousBundleIDs.contains(bundleID),
+                      "phase_1 app must appear in anomalousBundleIDs for icon tinting even with < 30 samples")
+        XCTAssertNil(detector.lastNotificationDates[bundleID],
+                     "notification must be suppressed when sample_count < 30")
     }
 
     // MARK: - AnomalyDetector: ignored bundle IDs are excluded
