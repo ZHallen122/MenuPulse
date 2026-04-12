@@ -59,10 +59,20 @@ final class DataStore {
     }
 
     /// Returns the most recent daily baseline for `bundleID`, or `nil` if none.
-    func baseline(for bundleID: String) -> (avgMB: Double, p90MB: Double)? {
-        var result: (Double, Double)?
+    func baseline(for bundleID: String) -> (avgMB: Double, medianMB: Double, p90MB: Double)? {
+        var result: (Double, Double, Double)?
         queue.sync {
             result = queryBaseline(for: bundleID)
+        }
+        return result
+    }
+
+    /// Returns the total number of sample-insert ticks recorded for `bundleID` in app_lifecycle.
+    /// Returns 0 if no lifecycle row exists for the app.
+    func sampleCount(for bundleID: String) -> Int {
+        var result = 0
+        queue.sync {
+            result = querySampleCount(for: bundleID)
         }
         return result
     }
@@ -80,9 +90,9 @@ final class DataStore {
     // MARK: - Lifecycle API (section 6.6)
 
     /// Returns the lifecycle state for the given bundle ID.
-    /// Defaults to `"learning"` if the app has no recorded entry.
+    /// Defaults to `"learning_phase_1"` if the app has no recorded entry.
     func appState(for bundleID: String) -> String {
-        var result = "learning"
+        var result = "learning_phase_1"
         queue.sync {
             result = queryAppState(for: bundleID)
         }
@@ -107,14 +117,15 @@ final class DataStore {
         }
     }
 
-    /// Marks all apps last seen before `lastSeenCutoff` whose state is `"active"` as `"stale"`.
+    /// Marks all apps last seen before `lastSeenCutoff` in any non-terminal state as `"stale"`.
+    /// Terminal states (`"stale"` and `"ignored"`) are never overwritten.
     func markStaleApps(lastSeenCutoff: Date) {
         queue.async { [weak self] in
             self?.doMarkStaleApps(lastSeenCutoff: lastSeenCutoff)
         }
     }
 
-    /// Resets an app to the `"learning"` state and records now as `learning_started_at`.
+    /// Resets an app to the `"learning_phase_1"` state and records now as `learning_started_at`.
     func resetToLearning(bundleID: String, version: String?) {
         queue.async { [weak self] in
             self?.doResetToLearning(bundleID: bundleID, version: version)
@@ -196,6 +207,7 @@ final class DataStore {
             NSLog("DataStore: failed to create app_lifecycle table: %@", String(cString: sqlite3_errmsg(db)))
         }
         migrateDailyBaselines()
+        migrateAppLifecycle()
     }
 
     /// Adds `version` and `state` columns to `daily_baselines` if they don't already exist.
@@ -214,17 +226,41 @@ final class DataStore {
         }
         sqlite3_finalize(pragmaStmt)
 
-        if !existingColumns.contains("version") {
-            let sql = "ALTER TABLE daily_baselines ADD COLUMN version TEXT;"
+        if !existingColumns.contains("median_mb") {
+            let sql = "ALTER TABLE daily_baselines ADD COLUMN median_mb REAL;"
             if sqlite3_exec(db, sql, nil, nil, nil) != SQLITE_OK {
-                NSLog("DataStore: failed to add 'version' column to daily_baselines: %@",
+                NSLog("DataStore: failed to add 'median_mb' column to daily_baselines: %@",
                       String(cString: sqlite3_errmsg(db)))
             }
         }
-        if !existingColumns.contains("state") {
-            let sql = "ALTER TABLE daily_baselines ADD COLUMN state TEXT DEFAULT 'active';"
+        if !existingColumns.contains("median_mb") {
+            let sql = "ALTER TABLE daily_baselines ADD COLUMN median_mb REAL;"
             if sqlite3_exec(db, sql, nil, nil, nil) != SQLITE_OK {
-                NSLog("DataStore: failed to add 'state' column to daily_baselines: %@",
+                NSLog("DataStore: failed to add 'median_mb' column to daily_baselines: %@",
+                      String(cString: sqlite3_errmsg(db)))
+            }
+        }
+    }
+
+    /// Adds `sample_count` column to `app_lifecycle` if it doesn't already exist.
+    private func migrateAppLifecycle() {
+        guard let db = db else { return }
+        var existingColumns = Set<String>()
+        let pragmaSQL = "PRAGMA table_info(app_lifecycle);"
+        var pragmaStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, pragmaSQL, -1, &pragmaStmt, nil) == SQLITE_OK {
+            while sqlite3_step(pragmaStmt) == SQLITE_ROW {
+                if let namePtr = sqlite3_column_text(pragmaStmt, 1) {
+                    existingColumns.insert(String(cString: namePtr))
+                }
+            }
+        }
+        sqlite3_finalize(pragmaStmt)
+
+        if !existingColumns.contains("sample_count") {
+            let sql = "ALTER TABLE app_lifecycle ADD COLUMN sample_count INTEGER DEFAULT 0;"
+            if sqlite3_exec(db, sql, nil, nil, nil) != SQLITE_OK {
+                NSLog("DataStore: failed to add 'sample_count' column to app_lifecycle: %@",
                       String(cString: sqlite3_errmsg(db)))
             }
         }
@@ -241,6 +277,7 @@ final class DataStore {
         }
         defer { sqlite3_finalize(stmt) }
 
+        var seenBundleIDs = Set<String>()
         for process in processes {
             let bundleID = process.bundleIdentifier ?? "unknown"
             let memMB = Double(process.memoryFootprintBytes) / 1_048_576.0
@@ -259,6 +296,27 @@ final class DataStore {
                 NSLog("DataStore: insertSamples sqlite3_step failed (%d): %@", rc, String(cString: sqlite3_errmsg(db)))
             }
             sqlite3_reset(stmt)
+            seenBundleIDs.insert(bundleID)
+        }
+
+        // Increment sample_count for each unique bundle ID seen this tick.
+        let countSQL = """
+            INSERT INTO app_lifecycle (bundle_id, sample_count) VALUES (?, 1)
+            ON CONFLICT(bundle_id) DO UPDATE SET sample_count = sample_count + 1;
+            """
+        var countStmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, countSQL, -1, &countStmt, nil) == SQLITE_OK else {
+            NSLog("DataStore: sqlite3_prepare_v2 failed in insertSamples (count): %@", String(cString: sqlite3_errmsg(db)))
+            return
+        }
+        defer { sqlite3_finalize(countStmt) }
+        for bundleID in seenBundleIDs {
+            sqlite3_bind_text(countStmt, 1, (bundleID as NSString).utf8String, -1, nil)
+            let crc = sqlite3_step(countStmt)
+            if crc != SQLITE_DONE && crc != SQLITE_ROW {
+                NSLog("DataStore: sample_count increment failed (%d): %@", crc, String(cString: sqlite3_errmsg(db)))
+            }
+            sqlite3_reset(countStmt)
         }
     }
 
@@ -335,7 +393,7 @@ final class DataStore {
         }
 
         // Upsert computed baselines.
-        let upsertSQL = "INSERT OR REPLACE INTO daily_baselines (bundle_id, date, avg_mb, p90_mb) VALUES (?, ?, ?, ?);"
+        let upsertSQL = "INSERT OR REPLACE INTO daily_baselines (bundle_id, date, avg_mb, p90_mb, median_mb) VALUES (?, ?, ?, ?, ?);"
         var uStmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, upsertSQL, -1, &uStmt, nil) == SQLITE_OK else {
             NSLog("DataStore: sqlite3_prepare_v2 failed in rebuildBaselines (upsert): %@", String(cString: sqlite3_errmsg(db)))
@@ -348,10 +406,14 @@ final class DataStore {
             let avg = sorted.reduce(0, +) / Double(sorted.count)
             let p90Index = max(0, Int(Double(sorted.count - 1) * 0.9))
             let p90 = sorted[p90Index]
+            let median: Double = sorted.count % 2 == 1
+                ? sorted[sorted.count / 2]
+                : (sorted[sorted.count / 2 - 1] + sorted[sorted.count / 2]) / 2.0
             if sqlite3_bind_text(uStmt, 1, (group.bundleID as NSString).utf8String, -1, nil) != SQLITE_OK ||
                sqlite3_bind_text(uStmt, 2, (group.date as NSString).utf8String, -1, nil) != SQLITE_OK ||
                sqlite3_bind_double(uStmt, 3, avg) != SQLITE_OK ||
-               sqlite3_bind_double(uStmt, 4, p90) != SQLITE_OK {
+               sqlite3_bind_double(uStmt, 4, p90) != SQLITE_OK ||
+               sqlite3_bind_double(uStmt, 5, median) != SQLITE_OK {
                 NSLog("DataStore: bind failed in rebuildBaselines (upsert): %@", String(cString: sqlite3_errmsg(db)))
                 sqlite3_reset(uStmt)
                 sqlite3_clear_bindings(uStmt)
@@ -389,9 +451,9 @@ final class DataStore {
         return rows
     }
 
-    private func queryBaseline(for bundleID: String) -> (avgMB: Double, p90MB: Double)? {
+    private func queryBaseline(for bundleID: String) -> (avgMB: Double, medianMB: Double, p90MB: Double)? {
         guard let db = db else { return nil }
-        let sql = "SELECT avg_mb, p90_mb FROM daily_baselines WHERE bundle_id = ? ORDER BY date DESC LIMIT 1;"
+        let sql = "SELECT avg_mb, median_mb, p90_mb FROM daily_baselines WHERE bundle_id = ? ORDER BY date DESC LIMIT 1;"
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
             NSLog("DataStore: sqlite3_prepare_v2 failed in queryBaseline: %@", String(cString: sqlite3_errmsg(db)))
@@ -403,20 +465,31 @@ final class DataStore {
             return nil
         }
         guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
-        return (sqlite3_column_double(stmt, 0), sqlite3_column_double(stmt, 1))
+        return (sqlite3_column_double(stmt, 0), sqlite3_column_double(stmt, 1), sqlite3_column_double(stmt, 2))
+    }
+
+    private func querySampleCount(for bundleID: String) -> Int {
+        guard let db = db else { return 0 }
+        let sql = "SELECT sample_count FROM app_lifecycle WHERE bundle_id = ?;"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return 0 }
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil) == SQLITE_OK else { return 0 }
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
+        return Int(sqlite3_column_int(stmt, 0))
     }
 
     // MARK: - Lifecycle private helpers
 
     private func queryAppState(for bundleID: String) -> String {
-        guard let db = db else { return "learning" }
+        guard let db = db else { return "learning_phase_1" }
         let sql = "SELECT state FROM app_lifecycle WHERE bundle_id = ?;"
         var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return "learning" }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return "learning_phase_1" }
         defer { sqlite3_finalize(stmt) }
-        guard sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil) == SQLITE_OK else { return "learning" }
-        guard sqlite3_step(stmt) == SQLITE_ROW else { return "learning" }
-        guard let ptr = sqlite3_column_text(stmt, 0) else { return "learning" }
+        guard sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil) == SQLITE_OK else { return "learning_phase_1" }
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return "learning_phase_1" }
+        guard let ptr = sqlite3_column_text(stmt, 0) else { return "learning_phase_1" }
         return String(cString: ptr)
     }
 
@@ -428,7 +501,7 @@ final class DataStore {
         defer { sqlite3_finalize(stmt) }
         guard sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil) == SQLITE_OK else { return nil }
         guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
-        let state = sqlite3_column_text(stmt, 0).map { String(cString: $0) } ?? "learning"
+        let state = sqlite3_column_text(stmt, 0).map { String(cString: $0) } ?? "learning_phase_1"
         let version: String? = sqlite3_column_type(stmt, 1) != SQLITE_NULL
             ? sqlite3_column_text(stmt, 1).map { String(cString: $0) }
             : nil
@@ -468,7 +541,7 @@ final class DataStore {
         } else {
             sqlite3_bind_null(stmt, 3)
         }
-        if state == "learning" {
+        if state.hasPrefix("learning_") {
             sqlite3_bind_int64(stmt, 4, nowTS)
         } else {
             sqlite3_bind_null(stmt, 4)
@@ -483,7 +556,7 @@ final class DataStore {
     private func doMarkStaleApps(lastSeenCutoff: Date) {
         guard let db = db else { return }
         let cutoffTS = Int64(lastSeenCutoff.timeIntervalSince1970)
-        let sql = "UPDATE app_lifecycle SET state = 'stale' WHERE last_seen_at < ? AND state = 'active';"
+        let sql = "UPDATE app_lifecycle SET state = 'stale' WHERE last_seen_at < ? AND state NOT IN ('stale', 'ignored');"
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
             NSLog("DataStore: prepare failed in doMarkStaleApps: %@", String(cString: sqlite3_errmsg(db)))
@@ -525,14 +598,17 @@ final class DataStore {
         guard let db = db else { return }
         let nowTS = Int64(Date().timeIntervalSince1970)
         // Upsert: always overwrite state, learning_started_at, and last_seen_at.
+        // Explicitly set sample_count = 0 so the minimum-sample guard correctly silences notifications
+        // during the first 15 minutes of the new version or return from stale.
         let sql = """
-            INSERT INTO app_lifecycle (bundle_id, state, version, learning_started_at, last_seen_at)
-            VALUES (?, 'learning', ?, ?, ?)
+            INSERT INTO app_lifecycle (bundle_id, state, version, learning_started_at, last_seen_at, sample_count)
+            VALUES (?, 'learning_phase_1', ?, ?, ?, 0)
             ON CONFLICT(bundle_id) DO UPDATE SET
-                state = 'learning',
+                state = 'learning_phase_1',
                 version = COALESCE(excluded.version, version),
                 learning_started_at = excluded.learning_started_at,
-                last_seen_at = excluded.last_seen_at;
+                last_seen_at = excluded.last_seen_at,
+                sample_count = 0;
             """
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
@@ -552,6 +628,24 @@ final class DataStore {
         if rc != SQLITE_DONE && rc != SQLITE_ROW {
             NSLog("DataStore: doResetToLearning failed (%d): %@", rc, String(cString: sqlite3_errmsg(db)))
         }
+
+        // Purge historical samples and baselines to prevent data pollution.
+        // A version update or a stale return means the old memory profile is no longer valid.
+        let delSamplesSQL = "DELETE FROM memory_samples WHERE bundle_id = ?;"
+        var delSamplesStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, delSamplesSQL, -1, &delSamplesStmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(delSamplesStmt, 1, (bundleID as NSString).utf8String, -1, nil)
+            sqlite3_step(delSamplesStmt)
+            sqlite3_finalize(delSamplesStmt)
+        }
+
+        let delBaselinesSQL = "DELETE FROM daily_baselines WHERE bundle_id = ?;"
+        var delBaselinesStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, delBaselinesSQL, -1, &delBaselinesStmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(delBaselinesStmt, 1, (bundleID as NSString).utf8String, -1, nil)
+            sqlite3_step(delBaselinesStmt)
+            sqlite3_finalize(delBaselinesStmt)
+        }
     }
 
     private func doIsInPerAppLearningPeriod(bundleID: String, duration: TimeInterval) -> Bool {
@@ -562,8 +656,8 @@ final class DataStore {
         defer { sqlite3_finalize(stmt) }
         guard sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil) == SQLITE_OK else { return false }
         guard sqlite3_step(stmt) == SQLITE_ROW else { return true } // unknown app defaults to learning
-        let state = sqlite3_column_text(stmt, 0).map { String(cString: $0) } ?? "learning"
-        guard state == "learning" else { return false }
+        let state = sqlite3_column_text(stmt, 0).map { String(cString: $0) } ?? "learning_phase_1"
+        guard state.hasPrefix("learning_") else { return false }
         guard sqlite3_column_type(stmt, 1) != SQLITE_NULL else { return true }
         let learningStartedAt = Date(timeIntervalSince1970: Double(sqlite3_column_int64(stmt, 1)))
         return Date().timeIntervalSince(learningStartedAt) < duration

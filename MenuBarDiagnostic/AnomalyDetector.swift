@@ -38,18 +38,16 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
         }
     }
 
+    /// internal: populated by sendNotification before the UNUserNotificationCenter guard;
+    /// lets unit tests verify notification copy without requiring a full app bundle.
+    var lastSentNotificationTitle: String?
+    var lastSentNotificationBody: String?
+
     /// Evaluate all running processes against the three anomaly conditions.
     /// Called from ProcessMonitor after each DataStore persist tick.
-    /// Apps in `learningBundleIDs` are skipped — their baseline is still forming.
+    /// Per-app lifecycle phase in `bundleIDPhases` controls baseline metric and threshold.
     func evaluate(processes: [MenuBarProcess], pressure: MemoryPressure,
-                  learningBundleIDs: Set<String> = []) {
-        // Suppress all anomaly detection and notifications during the 3-day learning period.
-        guard !prefs.isInLearningPeriod else {
-            anomalyStartDates.removeAll()
-            DispatchQueue.main.async { self.anomalousBundleIDs = [] }
-            return
-        }
-
+                  bundleIDPhases: [String: String] = [:]) {
         let testing = prefs.testingMode
 
         // Condition 3: system memory pressure must be .warning or .critical.
@@ -63,7 +61,6 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
         }
 
         let ignoredIDs = Set(prefs.ignoredBundleIDs)
-        let multiplier = prefs.sensitivity.anomalyMultiplier
         let now = Date()
         // In testing mode: samples persist every 5 s, so use a 2-minute window to
         // accumulate enough data points for a meaningful trend (normally 30 min).
@@ -74,18 +71,35 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
         var currentlyAnomalous = Set<String>()
 
         for process in processes {
-            guard let bundleID = process.bundleIdentifier,
-                  !ignoredIDs.contains(bundleID),
-                  !learningBundleIDs.contains(bundleID) else { continue }
-
+            guard let bundleID = process.bundleIdentifier else { continue }
             liveBundleIDs.insert(bundleID)
 
-            // Condition 1: current memory > p90 baseline × anomaly multiplier
-            guard let baseline = dataStore.baseline(for: bundleID),
-                  baseline.p90MB > 0 else { continue }
+            let state = bundleIDPhases[bundleID] ?? "learning_phase_1"
+
+            // Skip ignored apps.
+            guard state != "ignored", !ignoredIDs.contains(bundleID) else { continue }
+
+            // Select baseline metric and multiplier based on lifecycle phase.
+            let useMedian: Bool
+            let phaseMultiplier: Double
+            switch state {
+            case "learning_phase_1": useMedian = true;  phaseMultiplier = 4.0
+            case "learning_phase_2": useMedian = true;  phaseMultiplier = 3.0
+            case "learning_phase_3": useMedian = false; phaseMultiplier = 2.5
+            default:                 useMedian = false; phaseMultiplier = prefs.sensitivity.anomalyMultiplier
+            }
+
+            // 30-sample minimum: icon can tint but notification is suppressed below this.
+            let sampleCount = dataStore.sampleCount(for: bundleID)
+            let hasEnoughSamples = sampleCount >= 30
+
+            // Condition 1: current memory > phase baseline × phase multiplier
+            guard let baseline = dataStore.baseline(for: bundleID) else { continue }
+            let baselineValue = useMedian ? baseline.medianMB : baseline.p90MB
+            guard baselineValue > 0 else { continue }
 
             let currentMB = Double(process.memoryFootprintBytes) / 1_048_576.0
-            guard currentMB > baseline.p90MB * multiplier else {
+            guard currentMB > baselineValue * phaseMultiplier else {
                 anomalyStartDates.removeValue(forKey: bundleID)
                 continue
             }
@@ -110,12 +124,15 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
             let anomalyDurationGate: TimeInterval = testing ? 10 : 10 * 60
             guard now.timeIntervalSince(anomalyStart) >= anomalyDurationGate else { continue }
 
+            // Must have at least 30 samples for a reliable baseline before notifying.
+            guard hasEnoughSamples else { continue }
+
             // 24-hour per-app notification cooldown
             if let lastSent = lastNotificationDates[bundleID],
                now.timeIntervalSince(lastSent) < 24 * 3600 { continue }
 
-            let ratio = currentMB / baseline.p90MB
-            sendNotification(bundleID: bundleID, appName: process.name, currentMB: currentMB, ratio: ratio)
+            let ratio = currentMB / baselineValue
+            sendNotification(bundleID: bundleID, appName: process.name, currentMB: currentMB, ratio: ratio, phase: state)
             lastNotificationDates[bundleID] = now
         }
 
@@ -168,22 +185,34 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
             bundleID: "com.apple.Safari",
             appName: "Safari [TEST]",
             currentMB: 1234,
-            ratio: 3.7
+            ratio: 3.7,
+            phase: "active"
         )
     }
 
-    func sendNotification(bundleID: String, appName: String, currentMB: Double, ratio: Double) {
+    func sendNotification(bundleID: String, appName: String, currentMB: Double, ratio: Double, phase: String) {
         let content = UNMutableNotificationContent()
-        content.title = "\(appName) is using too much memory"
-        if currentMB >= 1000 {
-            let gb = currentMB / 1024.0
-            content.body = String(format: "Using %.1f GB — %.1fx its normal level. Your Mac is running low on memory.", gb, ratio)
+
+        // Phase-aware notification copy.
+        let memStr: String = currentMB >= 1000
+            ? String(format: "%.1f GB", currentMB / 1024.0)
+            : String(format: "%.0f MB", currentMB)
+
+        if phase == "learning_phase_1" || phase == "learning_phase_2" {
+            content.title = "Bouncer is still learning \(appName)"
+            content.body = "\(appName)'s memory looks unusually high right now (\(memStr)). Worth a look."
         } else {
-            content.body = String(format: "Using %.0f MB — %.1fx its normal level. Your Mac is running low on memory.", currentMB, ratio)
+            content.title = "\(appName) memory is abnormal"
+            content.body = String(format: "Currently using %@ — %.1fx its normal level. Recommended: restart \(appName).", memStr, ratio)
         }
+
         content.sound = .default
         content.categoryIdentifier = "MEMORY_ANOMALY"
         content.userInfo = ["bundleID": bundleID, "appName": appName]
+
+        // Capture for unit-test verification before the XCTest guard exits.
+        lastSentNotificationTitle = content.title
+        lastSentNotificationBody = content.body
 
         let request = UNNotificationRequest(
             identifier: "anomaly.\(bundleID)",
