@@ -1486,6 +1486,309 @@ final class MenuBarDiagnosticTests: XCTestCase {
                        "app returning after stale period should restart in learning_phase_1")
     }
 
+    // MARK: - DataStore: alert_events — insertAlertEvent
+
+    func testInsertAlertEventReturnsValidRowID() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let rowID = store.insertAlertEvent(
+            bundleID: "com.test.AlertInsert",
+            appName: "InsertApp",
+            startedAt: Date(),
+            peakMemoryMB: 150,
+            swapCorrelated: false
+        )
+        XCTAssertGreaterThanOrEqual(rowID, 1, "insertAlertEvent must return a row ID >= 1")
+    }
+
+    // MARK: - DataStore: alert_events — closeAlertEvent
+
+    func testCloseAlertEventSetsEndedAtAndUserAction() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let bundleID = "com.test.AlertClose"
+        let rowID = store.insertAlertEvent(
+            bundleID: bundleID,
+            appName: "CloseApp",
+            startedAt: Date(),
+            peakMemoryMB: 200,
+            swapCorrelated: false
+        )
+        XCTAssertGreaterThanOrEqual(rowID, 1)
+
+        store.closeAlertEvent(id: rowID, endedAt: Date(), userAction: "restarted")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let timeline = store.alertTimeline(bundleID: bundleID, days: 7)
+        XCTAssertEqual(timeline.count, 1, "timeline must contain the closed event")
+        XCTAssertNotNil(timeline.first?.endedAt, "endedAt must be set after closeAlertEvent")
+        XCTAssertEqual(timeline.first?.userAction, "restarted",
+                       "userAction must be 'restarted' after closeAlertEvent")
+    }
+
+    // MARK: - DataStore: alert_events — updateAlertEventPeak MAX semantics
+
+    func testUpdateAlertEventPeakMAXSemantics() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let bundleID = "com.test.PeakMax"
+        let rowID = store.insertAlertEvent(
+            bundleID: bundleID,
+            appName: "PeakApp",
+            startedAt: Date(),
+            peakMemoryMB: 100,
+            swapCorrelated: false
+        )
+        XCTAssertGreaterThanOrEqual(rowID, 1)
+
+        // Update to a higher value — should grow
+        store.updateAlertEventPeak(id: rowID, peakMemoryMB: 200)
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let after200 = store.alertTimeline(bundleID: bundleID, days: 7)
+        XCTAssertEqual(after200.first?.peakMemoryMB ?? 0, 200, accuracy: 0.01,
+                       "peak must grow to 200 MB after updating with a higher value")
+
+        // Update to a lower value — MAX semantics must prevent shrinkage
+        store.updateAlertEventPeak(id: rowID, peakMemoryMB: 50)
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let after50 = store.alertTimeline(bundleID: bundleID, days: 7)
+        XCTAssertEqual(after50.first?.peakMemoryMB ?? 0, 200, accuracy: 0.01,
+                       "peak must remain 200 MB after updateAlertEventPeak with a lower value (MAX semantics)")
+    }
+
+    // MARK: - DataStore: alertLeaderboard — aggregates correctly
+
+    func testAlertLeaderboardAggregatesCorrectly() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let bundleID = "com.test.Leaderboard"
+        let now = Date()
+
+        let id1 = store.insertAlertEvent(
+            bundleID: bundleID, appName: "LBApp",
+            startedAt: now.addingTimeInterval(-120), peakMemoryMB: 300, swapCorrelated: false
+        )
+        let id2 = store.insertAlertEvent(
+            bundleID: bundleID, appName: "LBApp",
+            startedAt: now.addingTimeInterval(-60), peakMemoryMB: 350, swapCorrelated: false
+        )
+        XCTAssertGreaterThanOrEqual(id1, 1)
+        XCTAssertGreaterThanOrEqual(id2, 1)
+
+        store.closeAlertEvent(id: id1, endedAt: now.addingTimeInterval(-90), userAction: "restarted")
+        store.closeAlertEvent(id: id2, endedAt: now.addingTimeInterval(-30), userAction: "quit")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let leaderboard = store.alertLeaderboard(days: 7)
+        let entry = leaderboard.first { $0.bundleID == bundleID }
+        XCTAssertNotNil(entry, "leaderboard must contain an entry for the test bundle ID")
+        XCTAssertEqual(entry?.alertCount, 2, "alertCount must be 2 for two inserted events")
+        XCTAssertEqual(entry?.restartedCount, 1, "restartedCount must be 1")
+        XCTAssertEqual(entry?.quitCount, 1, "quitCount must be 1")
+    }
+
+    // MARK: - DataStore: alertTimeline — newest-first ordering
+
+    func testAlertTimelineNewestFirst() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let bundleID = "com.test.Timeline"
+        let now = Date()
+
+        // Insert older event first, then newer event
+        let olderID = store.insertAlertEvent(
+            bundleID: bundleID, appName: "TimeApp",
+            startedAt: now.addingTimeInterval(-200), peakMemoryMB: 100, swapCorrelated: false
+        )
+        let newerID = store.insertAlertEvent(
+            bundleID: bundleID, appName: "TimeApp",
+            startedAt: now.addingTimeInterval(-100), peakMemoryMB: 200, swapCorrelated: false
+        )
+        XCTAssertGreaterThanOrEqual(olderID, 1)
+        XCTAssertGreaterThanOrEqual(newerID, 1)
+
+        store.closeAlertEvent(id: olderID, endedAt: now.addingTimeInterval(-150), userAction: "none")
+        store.closeAlertEvent(id: newerID, endedAt: now.addingTimeInterval(-50), userAction: "none")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let timeline = store.alertTimeline(bundleID: bundleID, days: 7)
+        XCTAssertEqual(timeline.count, 2, "timeline must contain both inserted events")
+        XCTAssertGreaterThan(
+            timeline[0].startedAt.timeIntervalSince1970,
+            timeline[1].startedAt.timeIntervalSince1970,
+            "alertTimeline must return entries newest-first (higher startedAt first)"
+        )
+    }
+
+    // MARK: - DataStore: markIgnored survives markStaleApps
+
+    func testMarkIgnoredSurvivesMarkStaleApps() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let bundleID = "com.test.IgnoredStale"
+
+        store.markIgnored(bundleID: bundleID)
+        Thread.sleep(forTimeInterval: 0.1)
+
+        // Use a cutoff 1 second in the future so last_seen_at < cutoff is true,
+        // which would normally flip the state to "stale". Ignored is a terminal state
+        // and must be preserved by the NOT IN ('stale', 'ignored') guard.
+        store.markStaleApps(lastSeenCutoff: Date().addingTimeInterval(1))
+        Thread.sleep(forTimeInterval: 0.1)
+
+        XCTAssertEqual(store.appState(for: bundleID), "ignored",
+                       "ignored state must survive markStaleApps — it is a terminal state")
+    }
+
+    // MARK: - AnomalyDetector: Bouncer self-exclusion guard
+
+    func testBouncerSelfExclusionGuard() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let detector = AnomalyDetector(dataStore: store, prefs: PreferencesManager())
+
+        // Pass Bouncer at extreme memory under warning pressure.
+        // The guard `bundleID != "com.allenz.Bouncer"` fires before any baseline lookup.
+        let bouncerProcess = MenuBarProcess(
+            pid: 9999,
+            name: "Bouncer",
+            bundleIdentifier: "com.allenz.Bouncer",
+            icon: nil,
+            cpuFraction: 0,
+            cpuHistory: [],
+            memoryHistory: [],
+            memoryFootprintBytes: UInt64(9999 * 1_048_576),
+            thermalState: .nominal,
+            launchDate: nil
+        )
+        detector.evaluate(processes: [bouncerProcess], pressure: .warning)
+
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        XCTAssertFalse(detector.anomalousBundleIDs.contains("com.allenz.Bouncer"),
+                       "Bouncer self-exclusion guard must prevent com.allenz.Bouncer from being flagged")
+    }
+
+    // MARK: - AnomalyDetector: activeAlertEventIDs is set when anomaly is confirmed
+
+    func testActiveAlertEventIDsSetOnAnomalyConfirmed() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let bundleID = "com.test.AlertEventSet"
+
+        // 35 samples → sample_count = 35 (≥ 30), baseline p90 ≈ 100 MB
+        seedSamples(store: store, bundleID: bundleID, memoryMB: 100, count: 35, pidBase: 9000)
+        store.recomputeBaselines()
+        Thread.sleep(forTimeInterval: 0.1)
+
+        // Two trend samples 1 second apart → positive slope
+        store.persistSamples([makeProcess(bundleID: bundleID, memoryMB: 100, pid: 9100)])
+        Thread.sleep(forTimeInterval: 1.1)
+        store.persistSamples([makeProcess(bundleID: bundleID, memoryMB: 200, pid: 9101)])
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let detector = AnomalyDetector(dataStore: store, prefs: PreferencesManager())
+        // Pre-seed anomalyStartDate 11 minutes ago to satisfy the 10-min persistence gate
+        detector.anomalyStartDates[bundleID] = Date().addingTimeInterval(-11 * 60)
+
+        // 300 MB > p90(100) × 2.5 = 250 MB ✓; positive slope ✓; pressure .warning ✓; 35 samples ≥ 30 ✓
+        detector.evaluate(
+            processes: [makeProcess(bundleID: bundleID, memoryMB: 300)],
+            pressure: .warning,
+            bundleIDPhases: [bundleID: "active"]
+        )
+
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        XCTAssertNotNil(detector.activeAlertEventIDs[bundleID],
+                        "activeAlertEventIDs must contain an entry after anomaly is confirmed")
+        XCTAssertGreaterThanOrEqual(detector.activeAlertEventIDs[bundleID] ?? -1, 1,
+                                    "activeAlertEventIDs entry must be a valid row ID (>= 1)")
+    }
+
+    // MARK: - AnomalyDetector: activeAlertEventIDs is cleared when anomaly resolves
+
+    func testActiveAlertEventIDsClearedOnResolve() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let bundleID = "com.test.AlertEventClear"
+
+        // Build a baseline so condition 1 can be checked (p90 = 100 MB, threshold = 250 MB)
+        let baseProcs = (1...10).map { i in
+            makeProcess(bundleID: bundleID, memoryMB: 100, pid: Int32(9200 + i))
+        }
+        store.persistSamples(baseProcs)
+        Thread.sleep(forTimeInterval: 0.1)
+        store.recomputeBaselines()
+        Thread.sleep(forTimeInterval: 0.1)
+
+        // Insert a real alert event and pre-seed it into the detector
+        let eventID = store.insertAlertEvent(
+            bundleID: bundleID, appName: "ClearApp",
+            startedAt: Date().addingTimeInterval(-15 * 60),
+            peakMemoryMB: 400, swapCorrelated: false
+        )
+        XCTAssertGreaterThanOrEqual(eventID, 1)
+
+        let detector = AnomalyDetector(dataStore: store, prefs: PreferencesManager())
+        detector.activeAlertEventIDs[bundleID] = eventID
+
+        // 50 MB < 250 MB → condition 1 fails → resolvedBundleIDs cleanup fires
+        detector.evaluate(
+            processes: [makeProcess(bundleID: bundleID, memoryMB: 50)],
+            pressure: .warning,
+            bundleIDPhases: [bundleID: "active"]
+        )
+
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        Thread.sleep(forTimeInterval: 0.1)   // wait for async closeAlertEvent
+
+        XCTAssertNil(detector.activeAlertEventIDs[bundleID],
+                     "activeAlertEventIDs must be cleared when the anomaly resolves")
+
+        let timeline = store.alertTimeline(bundleID: bundleID, days: 7)
+        XCTAssertNotNil(timeline.first?.endedAt,
+                        "ended_at must be set in the DB after the resolved anomaly closes its event")
+    }
+
+    // MARK: - AnomalyDetector: recordUserAction closes the event with the correct action
+
+    func testRecordUserActionClosesEventWithCorrectAction() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let bundleID = "com.test.UserAction"
+
+        let eventID = store.insertAlertEvent(
+            bundleID: bundleID, appName: "UserActionApp",
+            startedAt: Date().addingTimeInterval(-5 * 60),
+            peakMemoryMB: 500, swapCorrelated: false
+        )
+        XCTAssertGreaterThanOrEqual(eventID, 1)
+
+        let detector = AnomalyDetector(dataStore: store, prefs: PreferencesManager())
+        detector.activeAlertEventIDs[bundleID] = eventID
+
+        detector.recordUserAction("quit", for: bundleID)
+        Thread.sleep(forTimeInterval: 0.1)   // wait for async closeAlertEvent
+
+        XCTAssertNil(detector.activeAlertEventIDs[bundleID],
+                     "activeAlertEventIDs must be cleared after recordUserAction")
+
+        let timeline = store.alertTimeline(bundleID: bundleID, days: 7)
+        XCTAssertEqual(timeline.first?.userAction, "quit",
+                       "user_action in DB must be 'quit' after recordUserAction(\"quit\")")
+    }
+
     // MARK: - AppIcon asset wiring
 
     func testAppIconAppiconsetContainsContentsJson() {
