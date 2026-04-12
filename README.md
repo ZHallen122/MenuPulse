@@ -34,7 +34,7 @@ The icon color reflects current system state at a glance:
 - **10-minute persistence gate** — An app must remain anomalous for 10 continuous minutes before a notification fires.
 - **Memory sparklines** — Click the status icon to open the popover and see rolling memory sparklines for every monitored app. Anomalous apps are highlighted in amber.
 - **Swap memory detection** — `SwapMonitor` polls `vm.swapusage` every 30 seconds. When swap transitions from inactive to active, Bouncer sends a notification with **Quit Top App** / **View All** / **Dismiss** actions (1-hour cooldown). The icon turns orange while swap is in use, and red when swap is growing rapidly (> ~10 MB/min).
-- **Settings** — Configure the ignore list, sensitivity (Low / Medium / High), and launch at login.
+- **Settings** — Configure sensitivity (Low / Medium / High), launch at login, and a dedicated Block List tab for managing ignored bundle IDs via a list UI with `+` / `-` controls.
 - **First-launch onboarding** — On first run a welcome sheet explains what Bouncer does and requests notification permission. Shown once, gated by `hasShownOnboarding`.
 - **Automatic updates** — Sparkle 2.9.1 checks for updates in the background. A "Check for Updates" button is available in Settings, and automatic checks can be toggled on/off.
 
@@ -89,7 +89,7 @@ ProcessMonitor  ──samples every 2s──►  AnomalyDetector
 | `SwapMonitor.swift` | `ObservableObject` that polls `vm.swapusage` every 30 s; publishes swap stats and `SwapState`; posts swap-active notification |
 | `SparklineView.swift` | `Canvas`-based rolling memory sparkline |
 | `PreferencesManager.swift` | `ObservableObject` wrapping `@AppStorage` user preferences |
-| `SettingsView.swift` | SwiftUI settings UI (ignore list, sensitivity, launch at login) |
+| `SettingsView.swift` | SwiftUI settings UI (sensitivity, launch at login, Block List tab for ignored bundle IDs) |
 | `OnboardingView.swift` | First-launch onboarding sheet; requests notification permission; gated by `hasShownOnboarding` UserDefaults key |
 | `SparkleUpdater.swift` | Sparkle 2.9.1 wrapper; drives automatic and manual update checks |
 
@@ -143,7 +143,7 @@ xcodebuild -project "Menu Bar Diagnostic.xcodeproj" \
 
 | Setting | Description |
 |---|---|
-| Ignore list | Apps in this list are never monitored or alerted on |
+| Block List | Apps in this list are never monitored or alerted on; managed via a dedicated settings tab with `+` / `-` controls |
 | Sensitivity | Low / Medium / High — adjusts the p90 multiplier threshold |
 | Launch at login | Registers/unregisters via `SMAppService` |
 | Automatic updates | Enables background update checks via Sparkle; manual "Check for Updates" button always available |

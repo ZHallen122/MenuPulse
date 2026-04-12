@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.0.2] - 2026-04-12
+
+### Added
+
+- **Block List settings tab** — dedicated UI in Settings for managing ignored bundle IDs; replaces the old comma-separated text field with a proper list view with `+` / `-` controls
+
+### Changed
+
+- **App count in status menu** — the "N apps running" summary now reflects the filtered list (block-listed apps excluded from count)
+
 ## [1.0.1] - 2026-04-12
 
 ### Changed

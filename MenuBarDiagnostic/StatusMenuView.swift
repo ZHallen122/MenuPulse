@@ -27,7 +27,7 @@ struct StatusMenuView: View {
     // MARK: - Summary Header
 
     private var summaryHeader: some View {
-        let appCount = monitor.processes.count
+        let appCount = displayProcesses.count
         let anomalyCount = anomalyDetector.anomalousBundleIDs.count
         return VStack(alignment: .leading, spacing: 2) {
             Text("\(appCount) app\(appCount == 1 ? "" : "s") running")
@@ -91,15 +91,21 @@ struct StatusMenuView: View {
     // MARK: - Process Sections
 
     private var displayProcesses: [MenuBarProcess] {
-        monitor.processes.sorted { p1, p2 in
-            let a1 = anomalyDetector.anomalousBundleIDs.contains(p1.bundleIdentifier ?? "")
-            let a2 = anomalyDetector.anomalousBundleIDs.contains(p2.bundleIdentifier ?? "")
+        let ignored = Set(prefs.ignoredBundleIDs)
+        return monitor.processes
+            .filter { process in
+                guard let bid = process.bundleIdentifier else { return true }
+                return !ignored.contains(bid)
+            }
+            .sorted { p1, p2 in
+                let a1 = anomalyDetector.anomalousBundleIDs.contains(p1.bundleIdentifier ?? "")
+                let a2 = anomalyDetector.anomalousBundleIDs.contains(p2.bundleIdentifier ?? "")
 
-            if a1 && !a2 { return true }
-            if !a1 && a2 { return false }
+                if a1 && !a2 { return true }
+                if !a1 && a2 { return false }
 
-            return p1.memoryFootprintBytes > p2.memoryFootprintBytes
-        }
+                return p1.memoryFootprintBytes > p2.memoryFootprintBytes
+            }
     }
 
     @ViewBuilder

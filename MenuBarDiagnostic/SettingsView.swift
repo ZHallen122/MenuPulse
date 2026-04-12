@@ -12,6 +12,11 @@ struct SettingsView: View {
                     Label("General", systemImage: "gearshape")
                 }
             
+            BlockListSettingsView(prefs: prefs)
+                .tabItem {
+                    Label("Block List", systemImage: "nosign")
+                }
+            
             #if DEBUG
             DeveloperSettingsView(prefs: prefs, anomalyDetector: anomalyDetector)
                 .tabItem {
@@ -40,16 +45,6 @@ struct GeneralSettingsView: View {
                 Text("Alerts")
             } footer: {
                 Text("Controls how aggressively Bouncer flags memory anomalies. Higher sensitivity may produce more alerts.")
-                    .foregroundColor(.secondary)
-            }
-
-            Section {
-                TextField("Ignore Apps", text: $prefs.ignoredBundleIDsRaw, prompt: Text("com.example.App, …"))
-                    .font(.caption.monospaced())
-            } header: {
-                Text("Exclusions")
-            } footer: {
-                Text("Enter app bundle IDs separated by commas (e.g. com.example.App). Bouncer will skip these apps entirely.")
                     .foregroundColor(.secondary)
             }
 
@@ -153,5 +148,142 @@ struct DeveloperSettingsView: View {
             return "Testing Mode is active: thresholds and time windows are compressed so you can verify the full alert flow quickly. Reset the learning period, then fire a test alert to confirm everything works."
         }
         return "Reset the learning period to restart the 3-day baseline window. Alerts are suppressed while Bouncer is still learning normal behavior."
+    }
+}
+
+struct BlockListSettingsView: View {
+    @ObservedObject var prefs: PreferencesManager
+    @State private var selection: Set<String> = []
+    @State private var showingAddPopover = false
+    @State private var newBundleID = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Apps in the block list will be completely ignored by Bouncer.")
+                .foregroundColor(.secondary)
+
+            VStack(spacing: -1) {
+                List(selection: $selection) {
+                    ForEach(prefs.ignoredBundleIDs, id: \.self) { bundleID in
+                        Text(bundleID)
+                            .tag(bundleID)
+                    }
+                }
+                .onChange(of: prefs.ignoredBundleIDs) { _ in
+                    selection = selection.filter { prefs.ignoredBundleIDs.contains($0) }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                )
+
+                HStack(spacing: 8) {
+                    Button(action: {
+                        showingAddPopover = true
+                    }) {
+                        Image(systemName: "plus")
+                    }
+                    .buttonStyle(.plain)
+                    .popover(isPresented: $showingAddPopover, arrowEdge: .bottom) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Add App to Block List")
+                                .font(.headline)
+                            
+                            TextField("Bundle ID (e.g. com.example.App)", text: $newBundleID)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 250)
+                            
+                            HStack {
+                                Spacer()
+                                Button("Cancel") {
+                                    showingAddPopover = false
+                                    newBundleID = ""
+                                }
+                                .keyboardShortcut(.cancelAction)
+                                
+                                Button("Add") {
+                                    addBundleID(newBundleID)
+                                    showingAddPopover = false
+                                    newBundleID = ""
+                                }
+                                .keyboardShortcut(.defaultAction)
+                                .disabled(newBundleID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            }
+                        }
+                        .padding()
+                    }
+
+                    Button(action: {
+                        removeSelected()
+                    }) {
+                        Image(systemName: "minus")
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(selection.isEmpty)
+
+                    Spacer()
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(Color(NSColor.controlBackgroundColor))
+                .clipShape(
+                    .rect(
+                        topLeadingRadius: 0,
+                        bottomLeadingRadius: 6,
+                        bottomTrailingRadius: 6,
+                        topTrailingRadius: 0
+                    )
+                )
+                .overlay(
+                    CustomCornerBorder()
+                        .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                )
+            }
+            .frame(maxHeight: 300)
+        }
+        .padding()
+    }
+    
+    private func addBundleID(_ id: String) {
+        let trimmed = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        var current = prefs.ignoredBundleIDs
+        if !current.contains(trimmed) {
+            current.append(trimmed)
+            prefs.ignoredBundleIDs = current
+        }
+    }
+    
+    private func removeSelected() {
+        var current = prefs.ignoredBundleIDs
+        current.removeAll { selection.contains($0) }
+        prefs.ignoredBundleIDs = current
+        selection.removeAll()
+    }
+}
+
+private struct CustomCornerBorder: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - 6))
+        path.addArc(
+            center: CGPoint(x: rect.minX + 6, y: rect.maxY - 6),
+            radius: 6,
+            startAngle: .degrees(180),
+            endAngle: .degrees(90),
+            clockwise: true
+        )
+        path.addLine(to: CGPoint(x: rect.maxX - 6, y: rect.maxY))
+        path.addArc(
+            center: CGPoint(x: rect.maxX - 6, y: rect.maxY - 6),
+            radius: 6,
+            startAngle: .degrees(90),
+            endAngle: .degrees(0),
+            clockwise: true
+        )
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        return path
     }
 }
