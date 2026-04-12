@@ -187,9 +187,9 @@ Swap usage is growing rapidly and system is approaching crisis. Immediate action
 
 
 5.3 Popover Layout
-Clicking the menu bar icon opens a native NSPopover (not a window). Fixed width: 300px. Dynamic height up to 400px with scrolling. Two views accessible via a segmented control:
+Clicking the menu bar icon opens a native NSPopover (not a window). Fixed width: 300px. Dynamic height up to 400px with scrolling. The popover has two distinct zones: the main content area (Now view) and a persistent bottom bar.
 
-"Now" View — Default
+"Now" View — Main Content
 Shows the current top memory consumers. Each row: app icon, app name, current RAM, and a small inline sparkline. Anomalous apps are pinned to the top with a subtle amber background. Normal apps are shown in subdued secondary text color. Clicking any row expands an inline detail card with:
 Current vs. baseline memory
 30-minute trend description ("increasing" / "stable" / "decreasing")
@@ -200,10 +200,79 @@ Current vs. baseline memory
 
 The three action buttons follow a severity gradient: Restart is the lightest intervention, Quit is moderate, and Disable at Login is the most permanent. This progression gives users a clear mental model for how to respond to different situations.
 
-"History" View — Secondary
-A 7-day timeline of memory pressure events, showing which app triggered each alert and what action was taken. Useful for identifying chronic offenders. Simple list, no complex charts.
+Persistent Bottom Bar
+A fixed footer always visible at the bottom of the popover, regardless of scroll position. Contains three text buttons:
 
-5.4 Notification Design
+Bottom Bar Layout
+[ View History ]          [ Settings ]          [ Quit ]
+
+
+View History — opens the standalone History window (see Section 5.4)
+Settings — opens the Settings window
+Quit Bouncer — exits the app entirely
+
+These three actions are always one click away without cluttering the main content area. Quit Bouncer is intentionally included — power users expect to be able to exit a menu bar app cleanly without going to Activity Monitor.
+
+"History" View — Standalone Window
+History is a dedicated NSWindow, not a tab inside the Popover. This is a deliberate design decision: the Popover is built for quick 5-second glances, while History is a "sit down and investigate" experience that needs more space and longer dwell time. A 300px popover cannot comfortably host a leaderboard plus drill-down timeline.
+
+The History window opens when the user clicks "View History" in the Popover bottom bar. It does not close the Popover — both can coexist, allowing users to compare current state with historical patterns simultaneously. Window size: 600×500px, user-resizable.
+
+The History view serves one primary user motivation: identifying chronic offenders, not reviewing a log. The default view is therefore a ranked leaderboard rather than a chronological timeline. The timeline exists as a drill-down, not the entry point.
+
+Default: Top Offenders Leaderboard
+Apps are ranked in descending order by number of alerts triggered within the selected time window (default: 7 days, switchable to 30 days). Each row shows:
+Rank and app icon
+Total alert count in the period
+Average anomaly duration — how long the app stayed abnormal per event. This distinguishes a chronic slow leak (3 alerts, 2 hours each) from a noisy but self-resolving app (12 alerts, 2 minutes each).
+Last alert timestamp
+User action summary — e.g. "Restarted 6x, Ignored 2x" — giving the view a "battle record" feel
+
+Example Row
+#1  Slack     12 alerts     avg 23 min per event     Last: Yesterday 14:32     Restarted 9x  Ignored 3x
+
+
+Insight Card
+At the top of the leaderboard, a single plain-language insight card summarizes the most actionable finding:
+
+Insight Card Example
+"Slack triggered 12 alerts this month, averaging 23 minutes each. Consider quitting Slack when not in use, or disabling it at login on days you don't need it."
+
+
+This card is the moment Bouncer graduates from monitoring tool to advisor. It translates raw data into one human sentence with a concrete suggestion. It is never alarming in tone — only observational and helpful.
+
+Drill-Down: Per-App Timeline
+Clicking any row in the leaderboard opens an app-specific timeline — not a global event log, but the story of that app's relationship with the user's system. Each entry shows:
+Timestamp of the anomaly
+Peak memory during the event
+What the user did: Restarted / Quit / Ignored / No action taken
+Resolution: how long until the app returned to baseline, or whether it self-resolved
+Whether a Swap event was correlated at the same time
+
+Example Timeline Entries
+Yesterday 14:32   Abnormal (1.8GB)  →  You restarted Slack  →  Recovered in 2 min3 days ago 09:15  Abnormal (2.1GB)  →  You ignored         →  Self-resolved after 47 min5 days ago 22:01  Swap event, top contributor (1.6GB)  →  You quit Slack
+
+
+The per-app timeline is intentionally app-centric rather than system-centric. Users understand their own apps. A timeline that says "Slack did this" is immediately meaningful; a timeline that says "memory pressure event at 14:32" requires mental translation.
+
+5.4 Complete UI Flow
+Action
+Result
+Menu bar icon click
+Opens Popover (Now view)
+Popover → View History
+Opens standalone History window (600×500px). Popover stays open.
+Popover → Settings
+Opens Settings window. Popover stays open.
+Popover → Quit Bouncer
+Gracefully exits the app entirely.
+History leaderboard row click
+Expands per-app timeline drill-down within the History window.
+History window back button
+Returns to Top Offenders leaderboard.
+
+
+5.5 Notification Design
 Bouncer sends at most 2–3 notifications per day. Each notification follows this structure:
 
 Notification Template
@@ -216,7 +285,7 @@ Quit — gracefully quits the app without relaunching. Use this when you don't n
 
 Both actions execute directly from the notification without opening Bouncer. "Disable at Login" is intentionally omitted from the notification — it is a heavier, less reversible decision that belongs in the popover, not in a transient alert.
 
-5.5 Settings
+5.6 Settings
 Deliberately minimal. Only four user-configurable items in v1:
 Menu Bar Display — None (default) / Memory Pressure % / RAM Used. Allows users who want at-a-glance stats to opt in without changing the default experience for everyone else.
 Ignore list — apps Bouncer should never alert about (e.g., Xcode, Figma — expected heavy users)
@@ -475,7 +544,7 @@ Sensitivity setting (3 levels)
 IN v1.0
 Launch at login
 DEFERRED
-History view and event timeline
+History view: Top Offenders leaderboard (ranked by alert count + avg duration) with per-app timeline drill-down and plain-language insight card
 DEFERRED
 Weekly digest notifications
 DEFERRED
