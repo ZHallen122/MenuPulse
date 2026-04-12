@@ -7,6 +7,7 @@ struct StatusMenuView: View {
     @ObservedObject var anomalyDetector: AnomalyDetector
     @ObservedObject var swapMonitor: SwapMonitor
     var onSettingsTap: () -> Void
+    var onHistoryTap: () -> Void = {}
     var onClosePopover: () -> Void = {}
     @State private var expandedPID: pid_t? = nil
     @State private var hoveredFooterButton: String? = nil
@@ -135,6 +136,7 @@ struct StatusMenuView: View {
                             isExpanded: expandedPID == process.pid,
                             monitor: monitor,
                             prefs: prefs,
+                            anomalyDetector: anomalyDetector,
                             onTap: {
                                 expandedPID = expandedPID == process.pid ? nil : process.pid
                             }
@@ -151,14 +153,13 @@ struct StatusMenuView: View {
 
     private var footerBar: some View {
         HStack {
-            Button("About") {
-                onClosePopover()
-                NSApp.orderFrontStandardAboutPanel(nil)
+            Button("View History") {
+                onHistoryTap()
             }
             .buttonStyle(.plain)
-            .foregroundColor(hoveredFooterButton == "about" ? .primary : .secondary)
+            .foregroundColor(hoveredFooterButton == "history" ? .primary : .secondary)
             .font(.caption)
-            .onHover { hoveredFooterButton = $0 ? "about" : nil }
+            .onHover { hoveredFooterButton = $0 ? "history" : nil }
             Spacer()
             if #available(macOS 14.0, *) {
                 SettingsLink {
@@ -205,6 +206,7 @@ private struct ProcessRowView: View {
     let isExpanded: Bool
     let monitor: ProcessMonitor
     let prefs: PreferencesManager
+    let anomalyDetector: AnomalyDetector
     let onTap: () -> Void
 
     var body: some View {
@@ -343,6 +345,7 @@ private struct ProcessRowView: View {
 
     private func quitApp() {
         guard let bundleID = process.bundleIdentifier else { return }
+        anomalyDetector.recordUserAction("quit", for: bundleID)
         let workspace = NSWorkspace.shared
         guard let app = workspace.runningApplications.first(where: { $0.bundleIdentifier == bundleID }) else { return }
         app.terminate()
@@ -350,6 +353,7 @@ private struct ProcessRowView: View {
 
     private func restartApp() {
         guard let bundleID = process.bundleIdentifier else { return }
+        anomalyDetector.recordUserAction("restarted", for: bundleID)
         let workspace = NSWorkspace.shared
         guard let app = workspace.runningApplications.first(where: { $0.bundleIdentifier == bundleID }) else { return }
         let appURL = workspace.urlForApplication(withBundleIdentifier: bundleID)
@@ -366,5 +370,5 @@ private struct ProcessRowView: View {
     let monitor = ProcessMonitor(prefs: prefs)
     let detector = AnomalyDetector(dataStore: monitor.dataStore, prefs: prefs)
     let swapMonitor = SwapMonitor()
-    return StatusMenuView(monitor: monitor, prefs: prefs, anomalyDetector: detector, swapMonitor: swapMonitor, onSettingsTap: {})
+    return StatusMenuView(monitor: monitor, prefs: prefs, anomalyDetector: detector, swapMonitor: swapMonitor, onSettingsTap: {}, onHistoryTap: {})
 }

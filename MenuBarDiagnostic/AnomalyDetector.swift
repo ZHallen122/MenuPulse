@@ -28,6 +28,15 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
     // internal (not private) so tests can pre-seed
     var lastNotificationDates: [String: Date] = [:]
 
+    /// Active alert_events row IDs, keyed by bundle ID.
+    /// An entry exists while the anomaly is confirmed and open in the DB.
+    // internal (not private) so tests can verify event lifecycle
+    var activeAlertEventIDs: [String: Int64] = [:]
+
+    /// Whether swap was actively growing during the current evaluate() call.
+    /// Set by ProcessMonitor / AppDelegate before calling evaluate().
+    var swapCurrentlyActive: Bool = false
+
     init(dataStore: DataStore, prefs: PreferencesManager) {
         self.dataStore = dataStore
         self.prefs = prefs
@@ -127,6 +136,24 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
             // Must have at least 30 samples for a reliable baseline before notifying.
             guard hasEnoughSamples else { continue }
 
+            // --- Alert event tracking (History view) ---
+            // Open a new event row when the anomaly is first confirmed.
+            if activeAlertEventIDs[bundleID] == nil {
+                let eventID = dataStore.insertAlertEvent(
+                    bundleID: bundleID,
+                    appName: process.name,
+                    startedAt: anomalyStart,
+                    peakMemoryMB: currentMB,
+                    swapCorrelated: swapCurrentlyActive
+                )
+                if eventID >= 0 {
+                    activeAlertEventIDs[bundleID] = eventID
+                }
+            } else if let eventID = activeAlertEventIDs[bundleID] {
+                // Update the running peak memory while the anomaly persists.
+                dataStore.updateAlertEventPeak(id: eventID, peakMemoryMB: currentMB)
+            }
+
             // 24-hour per-app notification cooldown
             if let lastSent = lastNotificationDates[bundleID],
                now.timeIntervalSince(lastSent) < 24 * 3600 { continue }
@@ -139,6 +166,14 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
         // Clear anomaly tracking for processes that are no longer running
         for key in anomalyStartDates.keys where !liveBundleIDs.contains(key) {
             anomalyStartDates.removeValue(forKey: key)
+        }
+
+        // Close open alert events for anomalies that have resolved.
+        let resolvedBundleIDs = Set(activeAlertEventIDs.keys).subtracting(currentlyAnomalous)
+        for bundleID in resolvedBundleIDs {
+            if let eventID = activeAlertEventIDs.removeValue(forKey: bundleID) {
+                dataStore.closeAlertEvent(id: eventID, endedAt: now, userAction: "none")
+            }
         }
 
         DispatchQueue.main.async {
@@ -175,6 +210,15 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
     }
 
     // MARK: - Notifications
+
+    /// Records that the user manually quit or restarted `bundleID` from the popover.
+    /// Call this before the actual terminate() so the event is closed with the right action.
+    func recordUserAction(_ action: String, for bundleID: String) {
+        guard action == "quit" || action == "restarted" else { return }
+        if let eventID = activeAlertEventIDs.removeValue(forKey: bundleID) {
+            dataStore.closeAlertEvent(id: eventID, endedAt: Date(), userAction: action)
+        }
+    }
 
     /// Fires a synthetic "Safari is using too much memory" notification so you can
     /// verify the full notification→action flow without waiting for real anomaly conditions.
@@ -240,8 +284,15 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
 
         switch response.actionIdentifier {
         case "RESTART_NOW":
+            // Record user action before closing; restartApp runs asynchronously.
+            if let eventID = activeAlertEventIDs.removeValue(forKey: bundleID) {
+                dataStore.closeAlertEvent(id: eventID, endedAt: Date(), userAction: "restarted")
+            }
             restartApp(bundleID: bundleID, appName: appName)
         case "IGNORE":
+            if let eventID = activeAlertEventIDs.removeValue(forKey: bundleID) {
+                dataStore.closeAlertEvent(id: eventID, endedAt: Date(), userAction: "ignored")
+            }
             DispatchQueue.main.async {
                 if !bundleID.isEmpty && !self.prefs.ignoredBundleIDs.contains(bundleID) {
                     self.prefs.ignoredBundleIDs.append(bundleID)
