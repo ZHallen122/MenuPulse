@@ -84,6 +84,7 @@ class ProcessMonitor: ObservableObject {
         var state: String
         var version: String?
         var learningStartedAt: Date?
+        var lastSeen: Date
     }
 
     /// In-memory cache of per-app lifecycle state. Keyed by bundle ID.
@@ -275,7 +276,7 @@ class ProcessMonitor: ObservableObject {
                     } else if let newVer = version, let cachedVer = cached.version, newVer != cachedVer {
                         // Version changed: reset to learning_phase_1, announce update.
                         dataStore.resetToLearning(bundleID: bundleID, version: version)
-                        cached = LifecycleEntry(state: "learning_phase_1", version: version, learningStartedAt: now)
+                        cached = LifecycleEntry(state: "learning_phase_1", version: version, learningStartedAt: now, lastSeen: now)
                         lifecycleCache[bundleID] = cached
                         newUpdatesThisCycle[bundleID] = process.name
                     } else if cached.state == "stale" {
@@ -283,7 +284,8 @@ class ProcessMonitor: ObservableObject {
                         dataStore.resetToLearning(bundleID: bundleID, version: version)
                         cached = LifecycleEntry(state: "learning_phase_1",
                                                 version: version ?? cached.version,
-                                                learningStartedAt: now)
+                                                learningStartedAt: now,
+                                                lastSeen: now)
                         lifecycleCache[bundleID] = cached
                     }
                 } else {
@@ -293,24 +295,28 @@ class ProcessMonitor: ObservableObject {
                             // Already ignored in DB (e.g., app restarted): restore ignored state.
                             lifecycleCache[bundleID] = LifecycleEntry(state: "ignored",
                                                                        version: entry.version,
-                                                                       learningStartedAt: nil)
+                                                                       learningStartedAt: nil,
+                                                                       lastSeen: now)
                         } else if entry.state == "stale" {
                             // Known but dormant: restart learning.
                             dataStore.resetToLearning(bundleID: bundleID, version: version)
                             lifecycleCache[bundleID] = LifecycleEntry(state: "learning_phase_1",
                                                                        version: version ?? entry.version,
-                                                                       learningStartedAt: now)
+                                                                       learningStartedAt: now,
+                                                                       lastSeen: now)
                         } else {
                             lifecycleCache[bundleID] = LifecycleEntry(state: entry.state,
                                                                        version: entry.version,
-                                                                       learningStartedAt: entry.learningStartedAt)
+                                                                       learningStartedAt: entry.learningStartedAt,
+                                                                       lastSeen: now)
                         }
                     } else {
                         // Brand new app: start learning clock now.
                         dataStore.resetToLearning(bundleID: bundleID, version: version)
                         lifecycleCache[bundleID] = LifecycleEntry(state: "learning_phase_1",
                                                                    version: version,
-                                                                   learningStartedAt: now)
+                                                                   learningStartedAt: now,
+                                                                   lastSeen: now)
                     }
                 }
 
@@ -354,6 +360,13 @@ class ProcessMonitor: ObservableObject {
                 }
                 newPhaseMap[bundleID] = targetPhase
             }
+            // Evict entries not seen in the last 30 days so that when a stale app
+            // reappears the cache miss forces a fresh DB lookup (which will see the
+            // "stale" state written by markStaleApps) rather than reusing a stale
+            // "active" entry.
+            let staleEvictCutoff = now.addingTimeInterval(-30 * 24 * 3600)
+            lifecycleCache = lifecycleCache.filter { $0.value.lastSeen >= staleEvictCutoff }
+
             currentBundleIDPhases = newPhaseMap
 
             // Publish phase map and any new version-change events on the main queue.

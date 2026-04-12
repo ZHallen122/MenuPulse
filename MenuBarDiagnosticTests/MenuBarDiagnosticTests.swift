@@ -1450,6 +1450,42 @@ final class MenuBarDiagnosticTests: XCTestCase {
                        "app in learning_phase_1 last seen 31 days ago must be marked stale")
     }
 
+    // MARK: - Stale-cache eviction: 31-day re-appear scenario
+
+    func testStaleAppReappearsAfter31Days() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let bundleID = "com.test.StaleReturn"
+        let now = Date()
+        let thirtyOneDaysAgo = now.addingTimeInterval(-31 * 24 * 3600)
+
+        // Seed an active entry last seen 31 days ago.
+        store.updateAppLifecycle(bundleID: bundleID,
+                                 state: "active",
+                                 version: nil,
+                                 lastSeen: thirtyOneDaysAgo)
+        Thread.sleep(forTimeInterval: 0.1)
+
+        // Mark apps stale using a 30-day cutoff — this entry should be caught.
+        let staleCutoff = now.addingTimeInterval(-30 * 24 * 3600)
+        store.markStaleApps(lastSeenCutoff: staleCutoff)
+        Thread.sleep(forTimeInterval: 0.1)
+
+        // Confirm DB correctly wrote "stale".
+        XCTAssertEqual(store.lifecycleEntry(for: bundleID)?.state, "stale",
+                       "app last seen 31 days ago should be marked stale in the DB")
+
+        // Simulate ProcessMonitor missing the cache (entry evicted) and hitting the DB:
+        // it reads "stale", then calls resetToLearning.
+        store.resetToLearning(bundleID: bundleID, version: nil)
+        Thread.sleep(forTimeInterval: 0.1)
+
+        // After resetToLearning the app should be back in learning_phase_1.
+        XCTAssertEqual(store.lifecycleEntry(for: bundleID)?.state, "learning_phase_1",
+                       "app returning after stale period should restart in learning_phase_1")
+    }
+
     // MARK: - AppIcon asset wiring
 
     func testAppIconAppiconsetContainsContentsJson() {
