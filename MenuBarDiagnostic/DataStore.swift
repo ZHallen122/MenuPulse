@@ -271,6 +271,21 @@ final class DataStore {
         }
     }
 
+    /// Deletes any alert_events rows recorded for this app itself (rows written before the
+    /// self-exclusion guard was added). Safe to call repeatedly — idempotent DELETE.
+    private func purgeSelfAlertEvents() {
+        guard let db = db,
+              let ownID = Bundle.main.bundleIdentifier else { return }
+        let sql = "DELETE FROM alert_events WHERE bundle_id = ?;"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, (ownID as NSString).utf8String, -1, nil)
+        if sqlite3_step(stmt) != SQLITE_DONE {
+            NSLog("DataStore: purgeSelfAlertEvents failed: %@", String(cString: sqlite3_errmsg(db)))
+        }
+    }
+
     private func createTablesIfNeeded() {
         guard let db = db else { return }
         let memorySamples = """
@@ -329,6 +344,7 @@ final class DataStore {
         migrateAppLifecycle()
         migrateAlertEvents()
         closeOrphanedAlertEvents()
+        purgeSelfAlertEvents()
     }
 
     /// Adds `version` and `state` columns to `daily_baselines` if they don't already exist.
@@ -903,7 +919,7 @@ final class DataStore {
                 SUM(CASE WHEN user_action = 'quit'      THEN 1 ELSE 0 END) AS quit_count,
                 SUM(CASE WHEN user_action = 'ignored'   THEN 1 ELSE 0 END) AS ignored_count
             FROM alert_events
-            WHERE started_at >= ?
+            WHERE started_at >= ? AND bundle_id != COALESCE(?, '')
             GROUP BY bundle_id
             ORDER BY alert_count DESC, last_alert_at DESC;
             """
@@ -914,6 +930,8 @@ final class DataStore {
         }
         defer { sqlite3_finalize(stmt) }
         sqlite3_bind_int64(stmt, 1, cutoff)
+        let ownID = Bundle.main.bundleIdentifier ?? ""
+        sqlite3_bind_text(stmt, 2, (ownID as NSString).utf8String, -1, nil)
 
         var rows: [AlertLeaderboardEntry] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
