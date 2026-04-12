@@ -48,8 +48,6 @@ struct GeneralSettingsView: View {
                     .foregroundColor(.secondary)
             }
 
-
-
             Section {
                 Toggle("Launch at Login", isOn: $prefs.launchAtLogin)
                 Toggle("Automatically Check for Updates", isOn: $prefs.automaticUpdateChecks)
@@ -170,6 +168,9 @@ struct BlockListSettingsView: View {
                         Text(bundleID)
                             .tag(bundleID)
                     }
+                }
+                .onChange(of: prefs.ignoredBundleIDs) { _ in
+                    selection = selection.filter { prefs.ignoredBundleIDs.contains($0) }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 .overlay(
