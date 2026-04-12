@@ -336,7 +336,10 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
         }
 
         DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
-            guard let url = appURL else { return }
+            guard let url = appURL else {
+                NSLog("AnomalyDetector: appURL is nil for %@ (%@); skipping relaunch", appName, bundleID)
+                return
+            }
             NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration()) { _, error in
                 if let error = error {
                     NSLog("AnomalyDetector: failed to relaunch %@ (%@): %@", appName, bundleID, error.localizedDescription)
