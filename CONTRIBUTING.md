@@ -8,8 +8,8 @@
 ## Clone and build
 
 ```bash
-git clone https://github.com/your-org/menu-bar-diagnostic
-cd Menu-Bar-Diagnostic
+git clone https://github.com/ZHallen122/MenuPulse
+cd MenuPulse
 ```
 
 Command-line build:

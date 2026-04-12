@@ -88,6 +88,8 @@ ProcessMonitor  ──samples every 2s──►  AnomalyDetector
 | `IconColorLogic.swift` | Pure `iconColor()` function; maps `SwapState` + `pendingAnomalyAlert` → `NSColor` for the status bar icon |
 | `SwapMonitor.swift` | `ObservableObject` that polls `vm.swapusage` every 30 s; publishes swap stats and `SwapState`; posts swap-active notification |
 | `SparklineView.swift` | `Canvas`-based rolling memory sparkline |
+| `HistoryView.swift` | History window SwiftUI view; top-offenders leaderboard and per-app memory timeline |
+| `HistoryWindow.swift` | `NSWindow` subclass that hosts the history view |
 | `PreferencesManager.swift` | `ObservableObject` wrapping `@AppStorage` user preferences |
 | `SettingsView.swift` | SwiftUI settings UI (sensitivity, launch at login, Block List tab for ignored bundle IDs) |
 | `OnboardingView.swift` | First-launch onboarding sheet; requests notification permission; gated by `hasShownOnboarding` UserDefaults key |
@@ -106,8 +108,8 @@ ProcessMonitor  ──samples every 2s──►  AnomalyDetector
 
 1. Clone the repository and open the project:
    ```bash
-   git clone https://github.com/your-org/menu-bar-diagnostic
-   cd Menu-Bar-Diagnostic
+   git clone https://github.com/ZHallen122/MenuPulse
+   cd MenuPulse
    open "Menu Bar Diagnostic.xcodeproj"
    ```
 

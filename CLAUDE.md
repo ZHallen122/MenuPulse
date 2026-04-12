@@ -45,7 +45,10 @@ It wires `AppDelegate` via `@NSApplicationDelegateAdaptor`; `AppDelegate` owns t
 | Detection | `AnomalyDetector.swift` |
 | Icon coloring | `IconColorLogic.swift` |
 | Storage | `DataStore.swift` (SQLite) |
+| Popover root | `StatusMenuView.swift` (SwiftUI popover root; shows process list with sparklines and anomaly highlights) |
 | HUD UI | `HUDView.swift`, `HUDWindow.swift`, `HUDProcessRow.swift`, `ThermalHeaderView.swift`, `RAMBarView.swift`, `ProcessDetailSheet.swift` |
+| History UI | `HistoryView.swift`, `HistoryWindow.swift` (top-offenders leaderboard + per-app memory timeline) |
+| Sparkline widget | `SparklineView.swift` (`Canvas`-based rolling memory sparkline) |
 | Settings | `PreferencesManager.swift`, `SettingsView.swift` |
 | Onboarding | `OnboardingView.swift` |
 | Auto-update | `SparkleUpdater.swift` |
