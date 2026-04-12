@@ -339,35 +339,86 @@ System-level memory pressure is warning or critical (not normal)
 A notification is sent only when the app has been anomalous for 10+ consecutive minutes AND no notification has been sent for that app in the past 24 hours.
 
 6.6 Baseline Lifecycle & Learning Logic
-Bouncer assigns each app its own independent baseline state. This handles both the initial cold start and ongoing changes like new apps, version updates, and long-dormant apps returning.
+Bouncer assigns each app its own independent baseline state. Rather than a binary "silent then active" model, Bouncer uses a progressive four-phase system that begins providing value within hours of installation while becoming more precise over time. The core principle: "learn while speaking, but speak with increasing precision."
 
-First Launch (Global Cold Start)
-On first launch, Bouncer has no baselines for any app. It enters a 3-day global silent observation mode — sampling all running apps every 30 seconds but sending zero notifications. The popover shows a progress indicator: "Bouncer is learning your app patterns. Smart alerts start in 2 days." After 3 days, P90 baselines are computed for every observed app and active monitoring begins. This prevents false-positive floods on day one and gives users a reason to keep the app installed through the evaluation period.
+Progressive Four-Phase Learning Model
+
+Design Philosophy
+A 3-day silent period before any alerts would cause users to uninstall Bouncer before it ever does anything. The solution is not to wait — it is to speak early with appropriate humility, tighten confidence as data accumulates, and always be transparent about which phase the app is in.
+
+
+Phase
+Threshold
+Alert Sensitivity
+Notes
+Phase 1(0–4 hours)
+4.0x Median
+Extreme anomalies only
+Very few samples. Median used (not mean) to resist startup spikes. Minimum 30 samples required before any alert. Notification tone: tentative.
+Phase 2(4–24 hours)
+3.0x Median
+Significant anomalies
+One partial usage cycle observed. Still uses Median. Thresholds tighten. Notification tone: cautious.
+Phase 3(1–3 days)
+2.5x P90
+Standard detection
+Multiple usage cycles. Switch from Median to P90 baseline. Full detection active. Notification tone: confident.
+Active(3+ days)
+2.5x P90
+Full precision
+Mature baseline. P90 is stable and representative. Notification tone: assertive.
+
+
+Why Median, Not Mean, in Early Phases
+In Phase 1 and Phase 2, Bouncer uses the Median rather than the Mean as the baseline reference point. This is a deliberate statistical choice: Mean is highly sensitive to outliers, and app startup behavior is full of them. An app that spikes to 3GB during initial cache loading then settles at 400MB will produce a severely inflated Mean, making the threshold too high to catch real anomalies. The Median is immune to these extremes and produces a far more accurate picture of normal behavior from limited samples.
+
+Once enough data exists for a reliable P90 (Phase 3 onward), Bouncer switches to P90 as the baseline — it better captures the upper range of normal behavior than the Median does, reducing false positives from legitimate heavy usage peaks.
+
+Minimum Sample Guard
+Regardless of phase, Bouncer will never send a notification if fewer than 30 samples exist for that app. Thirty samples represents approximately 15 minutes of observation — the minimum needed to compute a statistically meaningful Median. Below this threshold, Bouncer may change the icon color as a soft signal but remains silent on notifications. This prevents false alerts in the first minutes after an app is first launched.
+
+Confidence-Aware Notification Copy
+Notification text adapts to the current phase, managing user expectations about alert precision. A Phase 1 alert that turns out to be a false positive should feel like "Bouncer is still learning" rather than "Bouncer is broken."
+
+Phase
+Notification Copy Style
+Phase 1 & 2(learning tone)
+"Bouncer is still learning Slack's habits, but its memory looks unusually high right now (2.1GB). Worth a look."
+Phase 3 & Active(confident tone)
+"Slack memory is abnormal. Currently using 2.1GB — 2.5x its normal level. Recommended: restart Slack."
+
 
 New App Discovered After Day 3
-When Bouncer encounters a bundle ID it has never seen before, it starts an independent 3-day learning period for that app only. All other already-monitored apps continue operating normally. The new app is marked as "Learning" in the popover with a small indicator. Bouncer does not use a global default baseline as a temporary stand-in — the risk of false positives from an untrained estimate is higher than the cost of a short silent period.
+When Bouncer encounters a bundle ID it has never seen before, it starts an independent Phase 1 learning period for that app only. All other already-monitored apps continue operating at their current phase. The new app is marked as "Learning" in the popover. Bouncer does not borrow a global default baseline — the false positive risk outweighs the benefit of immediate alerting.
 
 App Version Change
-A major app update can significantly change its normal memory footprint — for example, an app that used 300MB on v4 may legitimately use 500MB on v5. To avoid persistent false alerts after updates, Bouncer reads CFBundleShortVersionString from each app's Info.plist on every sample. If the version string changes, Bouncer automatically resets that app's baseline and restarts its 3-day learning period. The user sees a one-time note in the popover: "Slack was updated — relearning memory profile."
+A major update can significantly change an app's normal memory footprint. Bouncer reads CFBundleShortVersionString on every sample cycle. If the version string changes, that app's baseline is reset and it re-enters Phase 1. The user sees a one-time note in the popover: "Slack was updated — relearning memory profile."
 
 Long-Dormant App Returns
-If an app has not been observed for more than 30 days, its baseline is marked as stale. When it next appears in the running app list, Bouncer restarts a 3-day learning period rather than relying on outdated data. Usage patterns and app memory profiles can change significantly over a month.
+If an app has not been observed for more than 30 days, its baseline is marked stale. When it reappears, Bouncer restarts from Phase 1 rather than relying on outdated data.
 
 Baseline State Machine
 State
 Behavior
-learning
-App first seen or recently reset. Sampling silently, no alerts. Transitions to active after 3 days.
+learning_phase_1
+0–4 hours. Median baseline, 4x threshold, 30-sample minimum guard, tentative notification tone.
+learning_phase_2
+4–24 hours. Median baseline, 3x threshold, cautious notification tone.
+learning_phase_3
+1–3 days. P90 baseline, 2.5x threshold, confident notification tone.
 active
-Baseline established. Full anomaly detection and notifications enabled.
+3+ days. P90 baseline, 2.5x threshold, assertive notification tone. Full precision.
 stale
-App not seen in 30+ days. Transitions back to learning when app next runs.
+Not seen in 30+ days. Resets to learning_phase_1 on next appearance.
 ignored
-User has added app to ignore list. Sampled but never alerted. Manually reversible in settings.
+User-added to ignore list. Sampled but never alerted. Reversible in settings.
 
+
+AnomalyDetector Implementation Note
+The detector reads the app's current state from the baselines table and selects the appropriate multiplier and baseline metric accordingly. This keeps detection logic fully decoupled from state management — each phase is independently testable with a fixed multiplier and a known dataset.
 
 Data Model Update
-The baselines table stores two additional fields to support this lifecycle: version (the last observed CFBundleShortVersionString) and state (one of: learning, active, stale, ignored). The samples table is unchanged.
+The baselines table adds three fields: state (one of the six states above), version (last observed CFBundleShortVersionString for update detection), and sample_count (running total, used for the 30-sample minimum guard). The samples table is unchanged.
 
 6.7 Performance Targets
 Metric
