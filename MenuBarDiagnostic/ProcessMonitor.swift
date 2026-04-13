@@ -78,6 +78,21 @@ class ProcessMonitor: ObservableObject {
     /// off the main thread and serialised, avoiding data races.
     private let sampleQueue = DispatchQueue(label: "com.bouncer.sampling", qos: .utility)
 
+    // MARK: - Static app property cache (accessed only on sampleQueue)
+
+    private struct AppStaticProperties {
+        let name: String
+        let bundleIdentifier: String?
+        let bundleURL: URL?
+        let icon: NSImage?
+        let launchDate: Date?
+        let activationPolicy: NSApplication.ActivationPolicy
+    }
+
+    /// Per-PID cache of static NSRunningApplication properties (don't change for a given PID).
+    /// Populated on first encounter; pruned when the PID disappears from livePIDs.
+    private var appStaticCache: [pid_t: AppStaticProperties] = [:]
+
     // MARK: - Per-app lifecycle cache (accessed only on sampleQueue)
 
     private struct LifecycleEntry {
@@ -154,6 +169,26 @@ class ProcessMonitor: ObservableObject {
             let pid = app.processIdentifier
             guard pid > 0 else { continue }
 
+            // Look up or populate static property cache for this PID.
+            // icon (app.icon) is the most expensive property — it triggers an XPC call
+            // on first access. Caching it here ensures it is fetched only once per
+            // process lifetime. sampleQueue is serial so no additional locking is needed.
+            let staticProps: AppStaticProperties
+            if let cached = appStaticCache[pid] {
+                staticProps = cached
+            } else {
+                let props = AppStaticProperties(
+                    name: app.localizedName ?? "Unknown",
+                    bundleIdentifier: app.bundleIdentifier,
+                    bundleURL: app.bundleURL,
+                    icon: app.icon,
+                    launchDate: app.launchDate,
+                    activationPolicy: app.activationPolicy
+                )
+                appStaticCache[pid] = props
+                staticProps = props
+            }
+
             var info = proc_taskinfo()
             let infoSize = Int32(MemoryLayout<proc_taskinfo>.size)
             let ret = proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &info, infoSize)
@@ -218,15 +253,15 @@ class ProcessMonitor: ObservableObject {
 
             newProcesses.append(MenuBarProcess(
                 pid: pid,
-                name: app.localizedName ?? "Unknown",
-                bundleIdentifier: app.bundleIdentifier,
-                icon: app.icon,
+                name: staticProps.name,
+                bundleIdentifier: staticProps.bundleIdentifier,
+                icon: staticProps.icon,
                 cpuFraction: cpuFraction,
                 cpuHistory: history,
                 memoryHistory: memHistory,
                 memoryFootprintBytes: memFootprint,
                 thermalState: thermalState,
-                launchDate: app.launchDate
+                launchDate: staticProps.launchDate
             ))
         }
 
@@ -235,6 +270,7 @@ class ProcessMonitor: ObservableObject {
         previousSamples = previousSamples.filter { livePIDs.contains($0.key) }
         cpuHistories = cpuHistories.filter { livePIDs.contains($0.key) }
         memoryHistories = memoryHistories.filter { livePIDs.contains($0.key) }
+        appStaticCache = appStaticCache.filter { livePIDs.contains($0.key) }
 
         let sorted = newProcesses.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
 

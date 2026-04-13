@@ -38,6 +38,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var anomalyDetector: AnomalyDetector = AnomalyDetector(dataStore: monitor.dataStore, prefs: prefs)
     lazy var swapMonitor = SwapMonitor()
     lazy var sparkleUpdater = SparkleUpdater()
+    lazy var processListViewModel: ProcessListViewModel = ProcessListViewModel(
+        monitor: monitor,
+        anomalyDetector: anomalyDetector,
+        prefs: prefs
+    )
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -204,6 +209,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             prefs: prefs,
             anomalyDetector: anomalyDetector,
             swapMonitor: swapMonitor,
+            viewModel: processListViewModel,
             onSettingsTap: { [weak self] in self?.openSettings() },
             onHistoryTap: { [weak self] in self?.openHistory() },
             onClosePopover: { [weak self] in self?.popover?.performClose(nil) }
