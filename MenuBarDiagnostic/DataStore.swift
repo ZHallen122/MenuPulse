@@ -59,6 +59,7 @@ final class DataStore {
             var dbPtr: OpaquePointer?
             if sqlite3_open(path, &dbPtr) == SQLITE_OK {
                 self?.db = dbPtr
+                sqlite3_exec(dbPtr, "PRAGMA journal_mode=WAL;", nil, nil, nil)
             } else {
                 NSLog("DataStore: sqlite3_open failed for path %@: %@", path, String(cString: sqlite3_errmsg(dbPtr)))
             }
@@ -256,6 +257,8 @@ final class DataStore {
         if sqlite3_open(dbPath, &db) != SQLITE_OK {
             NSLog("DataStore: sqlite3_open failed for path %@: %@", dbPath, String(cString: sqlite3_errmsg(db)))
             db = nil
+        } else {
+            sqlite3_exec(db, "PRAGMA journal_mode=WAL;", nil, nil, nil)
         }
     }
 
@@ -436,6 +439,20 @@ final class DataStore {
         }
         defer { sqlite3_finalize(stmt) }
 
+        // Increment sample_count for each unique bundle ID seen this tick.
+        let countSQL = """
+            INSERT INTO app_lifecycle (bundle_id, sample_count) VALUES (?, 1)
+            ON CONFLICT(bundle_id) DO UPDATE SET sample_count = sample_count + 1;
+            """
+        var countStmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, countSQL, -1, &countStmt, nil) == SQLITE_OK else {
+            NSLog("DataStore: sqlite3_prepare_v2 failed in insertSamples (count): %@", String(cString: sqlite3_errmsg(db)))
+            return
+        }
+        defer { sqlite3_finalize(countStmt) }
+
+        sqlite3_exec(db, "BEGIN IMMEDIATE;", nil, nil, nil)
+
         var seenBundleIDs = Set<String>()
         for process in processes {
             let bundleID = process.bundleIdentifier ?? "unknown"
@@ -458,17 +475,6 @@ final class DataStore {
             seenBundleIDs.insert(bundleID)
         }
 
-        // Increment sample_count for each unique bundle ID seen this tick.
-        let countSQL = """
-            INSERT INTO app_lifecycle (bundle_id, sample_count) VALUES (?, 1)
-            ON CONFLICT(bundle_id) DO UPDATE SET sample_count = sample_count + 1;
-            """
-        var countStmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, countSQL, -1, &countStmt, nil) == SQLITE_OK else {
-            NSLog("DataStore: sqlite3_prepare_v2 failed in insertSamples (count): %@", String(cString: sqlite3_errmsg(db)))
-            return
-        }
-        defer { sqlite3_finalize(countStmt) }
         for bundleID in seenBundleIDs {
             sqlite3_bind_text(countStmt, 1, (bundleID as NSString).utf8String, -1, nil)
             let crc = sqlite3_step(countStmt)
@@ -477,6 +483,8 @@ final class DataStore {
             }
             sqlite3_reset(countStmt)
         }
+
+        sqlite3_exec(db, "COMMIT;", nil, nil, nil)
     }
 
     private func deleteStaleSamples() {
