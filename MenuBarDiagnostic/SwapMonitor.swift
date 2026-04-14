@@ -82,10 +82,10 @@ class SwapMonitor: ObservableObject {
     func buildNotificationContent(processes: [MenuBarProcess], state: SwapState) -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent()
         if state == .swapCritical {
-            content.title = "Critical: Mac is actively swapping to disk"
+            content.title = "Mac is swapping heavily — performance is affected"
             content.body = buildNotificationBody(processes: processes, urgent: true)
         } else {
-            content.title = "Your Mac is using disk as memory"
+            content.title = "Mac is using disk as overflow memory"
             content.body = buildNotificationBody(processes: processes, urgent: false)
         }
         content.categoryIdentifier = "SWAP_ACTIVE"

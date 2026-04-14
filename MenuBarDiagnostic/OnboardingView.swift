@@ -29,6 +29,12 @@ struct OnboardingView: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .padding(.top, 8)
+
+            Text("Bouncer learns your apps' normal behavior over 3 days before sending alerts.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 320)
         }
         .padding(48)
         .frame(width: 440, height: 340)

@@ -570,8 +570,8 @@ final class MenuBarDiagnosticTests: XCTestCase {
         swapMon.swapUsedBytes = UInt64(2.1 * 1_073_741_824)
         let processes = [makeProcess(bundleID: "com.tinyspeck.slackmacgap", memoryMB: 1126.4)]
         let content = swapMon.buildNotificationContent(processes: processes)
-        XCTAssertTrue(content.title.contains("Your Mac is using disk as memory"),
-                      "notification title must contain 'Your Mac is using disk as memory'")
+        XCTAssertTrue(content.title.contains("Mac is using disk as overflow memory"),
+                      "notification title must contain 'Mac is using disk as overflow memory'")
         XCTAssertTrue(content.body.contains("Biggest contributor"),
                       "notification body must name the biggest memory contributor")
     }
@@ -794,7 +794,7 @@ final class MenuBarDiagnosticTests: XCTestCase {
         let significantContent = monitor.buildNotificationContent(processes: [], state: .swapSignificant)
         XCTAssertNotEqual(criticalContent.title, significantContent.title,
                           "swapCritical and swapSignificant notifications must have different titles")
-        XCTAssertTrue(criticalContent.title.lowercased().contains("critical"),
+        XCTAssertTrue(criticalContent.title.lowercased().contains("swapping"),
                       "swapCritical notification title must convey urgency")
     }
 
@@ -1419,8 +1419,8 @@ final class MenuBarDiagnosticTests: XCTestCase {
         RunLoop.main.run(until: Date().addingTimeInterval(0.05))
         XCTAssertNotNil(detector.lastSentNotificationTitle,
                         "notification must have been sent for active phase above threshold with ≥30 samples")
-        XCTAssertTrue(detector.lastSentNotificationTitle?.contains("abnormal") == true,
-                      "active-phase notification title must contain 'abnormal'")
+        XCTAssertTrue(detector.lastSentNotificationTitle?.contains("too much memory") == true,
+                      "active-phase notification title must contain 'too much memory'")
     }
 
     func testStaleMarkingCoversLearningPhases() {

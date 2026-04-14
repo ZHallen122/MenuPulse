@@ -223,10 +223,10 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
 
         if phase == "learning_phase_1" || phase == "learning_phase_2" {
             content.title = "Bouncer is still learning \(appName)"
-            content.body = "\(appName)'s memory looks unusually high right now (\(memStr)). Worth a look."
+            content.body = "\(appName)'s memory looks unusually high (\(memStr)). Restarting it may help if your Mac feels slow."
         } else {
-            content.title = "\(appName) memory is abnormal"
-            content.body = String(format: "Currently using %@ — %.1fx its normal level. Recommended: restart \(appName).", memStr, ratio)
+            content.title = "\(appName) is using too much memory"
+            content.body = String(format: "Using %@ — %.1fx its normal level. Restart \(appName) to free up memory.", memStr, ratio)
         }
 
         content.sound = .default

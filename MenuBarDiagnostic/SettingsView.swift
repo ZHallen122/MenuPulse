@@ -14,7 +14,7 @@ struct SettingsView: View {
             
             BlockListSettingsView(prefs: prefs)
                 .tabItem {
-                    Label("Block List", systemImage: "nosign")
+                    Label("Ignored Apps", systemImage: "nosign")
                 }
             
             #if DEBUG
@@ -62,11 +62,11 @@ struct GeneralSettingsView: View {
             }
 
             Section {
-                Toggle("Show Memory Pressure", isOn: $prefs.showMemoryPressureInMenuBar)
+                Toggle("Show RAM Usage in Menu Bar", isOn: $prefs.showMemoryPressureInMenuBar)
             } header: {
                 Text("Display")
             } footer: {
-                Text("Shows how much memory your Mac is using, right in the menu bar.")
+                Text("Shows your current RAM usage percentage next to the Bouncer icon.")
                     .foregroundColor(.secondary)
             }
         }
@@ -159,7 +159,7 @@ struct BlockListSettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Apps in the block list will be completely ignored by Bouncer.")
+            Text("Apps in the ignored list will not be monitored or alerted on by Bouncer.")
                 .foregroundColor(.secondary)
 
             VStack(spacing: -1) {
