@@ -1785,6 +1785,276 @@ final class MenuBarDiagnosticTests: XCTestCase {
                        "user_action in DB must be 'quit' after recordUserAction(\"quit\")")
     }
 
+    // MARK: - AnomalyDetector: GB memory formatting in notification body
+
+    func testNotificationBodyFormatsGBWhenOver1000MB() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let bundleID = "com.test.GBFormat"
+
+        seedSamples(store: store, bundleID: bundleID, memoryMB: 100, count: 35, pidBase: 9300)
+        store.recomputeBaselines()
+        Thread.sleep(forTimeInterval: 0.1)
+
+        // Two trend samples 1 second apart → positive slope
+        store.persistSamples([makeProcess(bundleID: bundleID, memoryMB: 100, pid: 9400)])
+        Thread.sleep(forTimeInterval: 1.1)
+        store.persistSamples([makeProcess(bundleID: bundleID, memoryMB: 200, pid: 9401)])
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let detector = AnomalyDetector(dataStore: store, prefs: PreferencesManager())
+        detector.anomalyStartDates[bundleID] = Date().addingTimeInterval(-11 * 60)
+
+        // 1200 MB >> p90(100) × 2.5 = 250 MB threshold; 37 samples ≥ 30
+        detector.evaluate(
+            processes: [makeProcess(bundleID: bundleID, memoryMB: 1200)],
+            pressure: .warning,
+            bundleIDPhases: [bundleID: "active"]
+        )
+
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        XCTAssertNotNil(detector.lastSentNotificationBody,
+                        "notification body must be set for 1200 MB above active threshold")
+        XCTAssertTrue(detector.lastSentNotificationBody?.contains("GB") == true,
+                      "notification body must use GB formatting when memory >= 1000 MB")
+        XCTAssertFalse(detector.lastSentNotificationBody?.contains("MB") == true,
+                       "notification body must NOT contain 'MB' when memory is formatted as GB")
+    }
+
+    // MARK: - AnomalyDetector: recordUserAction with invalid action is a no-op
+
+    func testRecordUserActionWithInvalidActionIsNoOp() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let bundleID = "com.test.InvalidAction"
+
+        let eventID = store.insertAlertEvent(
+            bundleID: bundleID, appName: "InvalidActionApp",
+            startedAt: Date().addingTimeInterval(-5 * 60),
+            peakMemoryMB: 300, swapCorrelated: false
+        )
+        XCTAssertGreaterThanOrEqual(eventID, 1)
+
+        let detector = AnomalyDetector(dataStore: store, prefs: PreferencesManager())
+        detector.activeAlertEventIDs[bundleID] = eventID
+
+        detector.recordUserAction("invalidAction", for: bundleID)
+
+        // Invalid action must not touch activeAlertEventIDs
+        XCTAssertNotNil(detector.activeAlertEventIDs[bundleID],
+                        "activeAlertEventIDs must not be cleared for an invalid action")
+
+        Thread.sleep(forTimeInterval: 0.15)
+
+        let timeline = store.alertTimeline(bundleID: bundleID, days: 7)
+        XCTAssertNil(timeline.first?.endedAt,
+                     "event must remain open (endedAt nil) after recordUserAction with invalid action")
+    }
+
+    // MARK: - AnomalyDetector: swapCurrentlyActive propagates to swapCorrelated in DB
+
+    func testSwapCurrentlyActivePropagatesSwapCorrelated() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let bundleID = "com.test.SwapCorrelated"
+
+        seedSamples(store: store, bundleID: bundleID, memoryMB: 100, count: 35, pidBase: 9500)
+        store.recomputeBaselines()
+        Thread.sleep(forTimeInterval: 0.1)
+
+        // Two trend samples 1 second apart → positive slope
+        store.persistSamples([makeProcess(bundleID: bundleID, memoryMB: 100, pid: 9600)])
+        Thread.sleep(forTimeInterval: 1.1)
+        store.persistSamples([makeProcess(bundleID: bundleID, memoryMB: 200, pid: 9601)])
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let detector = AnomalyDetector(dataStore: store, prefs: PreferencesManager())
+        detector.anomalyStartDates[bundleID] = Date().addingTimeInterval(-11 * 60)
+        detector.swapCurrentlyActive = true
+
+        // 300 MB > p90(100) × 2.5 = 250 MB threshold (active phase, 37 samples ≥ 30)
+        detector.evaluate(
+            processes: [makeProcess(bundleID: bundleID, memoryMB: 300)],
+            pressure: .warning,
+            bundleIDPhases: [bundleID: "active"]
+        )
+
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        Thread.sleep(forTimeInterval: 0.3)
+
+        let timeline = store.alertTimeline(bundleID: bundleID, days: 7)
+        XCTAssertFalse(timeline.isEmpty, "alert timeline must contain an event after confirmed anomaly")
+        XCTAssertTrue(timeline.first?.swapCorrelated == true,
+                      "swapCorrelated must be true when swapCurrentlyActive was set before evaluate()")
+    }
+
+    // MARK: - DataStore: alertTimeline returns empty for unknown bundleID
+
+    func testAlertTimelineEmptyForUnknownBundleID() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let timeline = store.alertTimeline(bundleID: "com.test.NeverInserted", days: 7)
+        XCTAssertTrue(timeline.isEmpty,
+                      "alertTimeline must return empty for a bundle ID with no alert events")
+    }
+
+    // MARK: - DataStore: alertTimeline excludes events older than `days`
+
+    func testAlertTimelineDayFilter() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let bundleID = "com.test.TimelineFilter"
+        let now = Date()
+
+        // Event 10 days ago — outside the 7-day window
+        let oldID = store.insertAlertEvent(
+            bundleID: bundleID, appName: "FilterApp",
+            startedAt: now.addingTimeInterval(-10 * 86400),
+            peakMemoryMB: 200, swapCorrelated: false
+        )
+        // Event 3 days ago — inside the 7-day window
+        let recentID = store.insertAlertEvent(
+            bundleID: bundleID, appName: "FilterApp",
+            startedAt: now.addingTimeInterval(-3 * 86400),
+            peakMemoryMB: 300, swapCorrelated: false
+        )
+        XCTAssertGreaterThanOrEqual(oldID, 1)
+        XCTAssertGreaterThanOrEqual(recentID, 1)
+
+        store.closeAlertEvent(id: oldID, endedAt: now.addingTimeInterval(-10 * 86400 + 3600), userAction: "none")
+        store.closeAlertEvent(id: recentID, endedAt: now.addingTimeInterval(-3 * 86400 + 3600), userAction: "none")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let timeline = store.alertTimeline(bundleID: bundleID, days: 7)
+        XCTAssertEqual(timeline.count, 1,
+                       "alertTimeline(days: 7) must exclude events older than 7 days")
+        XCTAssertEqual(timeline.first?.peakMemoryMB ?? 0, 300, accuracy: 0.01,
+                       "the remaining event must be the 3-day-old one, not the 10-day-old one")
+    }
+
+    // MARK: - DataStore: alertLeaderboard excludes events older than `days`
+
+    func testAlertLeaderboardDayFilter() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let bundleID = "com.test.LeaderboardFilter"
+        let now = Date()
+
+        // Event 10 days ago — outside 7-day window
+        let oldID = store.insertAlertEvent(
+            bundleID: bundleID, appName: "LBFilterApp",
+            startedAt: now.addingTimeInterval(-10 * 86400),
+            peakMemoryMB: 200, swapCorrelated: false
+        )
+        // Event 2 days ago — inside 7-day window
+        let recentID = store.insertAlertEvent(
+            bundleID: bundleID, appName: "LBFilterApp",
+            startedAt: now.addingTimeInterval(-2 * 86400),
+            peakMemoryMB: 300, swapCorrelated: false
+        )
+        XCTAssertGreaterThanOrEqual(oldID, 1)
+        XCTAssertGreaterThanOrEqual(recentID, 1)
+
+        store.closeAlertEvent(id: oldID, endedAt: now.addingTimeInterval(-10 * 86400 + 3600), userAction: "none")
+        store.closeAlertEvent(id: recentID, endedAt: now.addingTimeInterval(-2 * 86400 + 3600), userAction: "none")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let leaderboard = store.alertLeaderboard(days: 7)
+        let entry = leaderboard.first { $0.bundleID == bundleID }
+        XCTAssertNotNil(entry, "leaderboard must contain an entry for the test bundle ID")
+        XCTAssertEqual(entry?.alertCount, 1,
+                       "alertLeaderboard(days: 7) must count only the event within the last 7 days")
+    }
+
+    // MARK: - DataStore: isInPerAppLearningPeriod
+
+    func testIsInPerAppLearningPeriodTrueAndFalse() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        store.resetToLearning(bundleID: "com.test.Learning", version: nil)
+        Thread.sleep(forTimeInterval: 0.1)
+
+        // Just started learning — elapsed ≈ 0 s < 4 h → true
+        XCTAssertTrue(store.isInPerAppLearningPeriod(bundleID: "com.test.Learning", duration: 4 * 3600),
+                      "isInPerAppLearningPeriod must be true when learning just started and duration is 4 hours")
+
+        // Unknown bundleID has no DB entry; implementation defaults to true (unknown = in learning)
+        XCTAssertTrue(store.isInPerAppLearningPeriod(bundleID: "com.test.Unknown", duration: 4 * 3600),
+                      "isInPerAppLearningPeriod must be true for an unknown bundle ID (unknown defaults to learning)")
+
+        // duration = 0 → elapsed > 0, so elapsed < 0 is false → returns false
+        XCTAssertFalse(store.isInPerAppLearningPeriod(bundleID: "com.test.Learning", duration: 0),
+                       "isInPerAppLearningPeriod must be false when duration window is 0 (already elapsed)")
+    }
+
+    // MARK: - DataStore: sampleCount increments with successive persists
+
+    func testSampleCountIncrementsWithSuccessivePersists() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let bundleID = "com.test.SampleCount"
+
+        // First persist tick: each call to persistSamples increments sample_count by 1
+        // per unique bundle ID seen in that tick (see insertSamples seenBundleIDs logic).
+        store.persistSamples([makeProcess(bundleID: bundleID, memoryMB: 100, pid: 11001)])
+        Thread.sleep(forTimeInterval: 0.1)
+        XCTAssertEqual(store.sampleCount(for: bundleID), 1,
+                       "sampleCount must be 1 after the first persistSamples call")
+
+        // Second persist tick with a different pid → sample_count increments to 2
+        store.persistSamples([makeProcess(bundleID: bundleID, memoryMB: 100, pid: 11002)])
+        Thread.sleep(forTimeInterval: 0.1)
+        XCTAssertEqual(store.sampleCount(for: bundleID), 2,
+                       "sampleCount must be 2 after the second persistSamples call")
+    }
+
+    // MARK: - AnomalyDetector: "ignored" phase in bundleIDPhases skips process
+
+    func testIgnoredPhaseInBundleIDPhasesSkipsProcess() {
+        let store = DataStore(path: ":memory:")
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let bundleID = "com.test.IgnoredPhase"
+
+        // Baseline p90 = 50 MB → any phase threshold well below 999 MB
+        let baseProcs = (1...10).map { i in
+            makeProcess(bundleID: bundleID, memoryMB: 50, pid: Int32(9700 + i))
+        }
+        store.persistSamples(baseProcs)
+        Thread.sleep(forTimeInterval: 0.1)
+        store.recomputeBaselines()
+        Thread.sleep(forTimeInterval: 0.1)
+
+        // Two trend samples 1 second apart → positive slope
+        store.persistSamples([makeProcess(bundleID: bundleID, memoryMB: 100, pid: 9800)])
+        Thread.sleep(forTimeInterval: 1.1)
+        store.persistSamples([makeProcess(bundleID: bundleID, memoryMB: 200, pid: 9801)])
+        Thread.sleep(forTimeInterval: 0.1)
+
+        let detector = AnomalyDetector(dataStore: store, prefs: PreferencesManager())
+        detector.anomalyStartDates[bundleID] = Date().addingTimeInterval(-11 * 60)
+
+        // 999 MB is way above any threshold, but bundleIDPhases marks the state as "ignored"
+        // This tests the `state != "ignored"` guard in evaluate(), distinct from prefs.ignoredBundleIDs.
+        detector.evaluate(
+            processes: [makeProcess(bundleID: bundleID, memoryMB: 999)],
+            pressure: .warning,
+            bundleIDPhases: [bundleID: "ignored"]
+        )
+
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        XCTAssertFalse(detector.anomalousBundleIDs.contains(bundleID),
+                       "process with 'ignored' phase in bundleIDPhases must be skipped regardless of memory level")
+    }
+
     // MARK: - AppIcon asset wiring
 
     func testAppIconAppiconsetContainsContentsJson() {
