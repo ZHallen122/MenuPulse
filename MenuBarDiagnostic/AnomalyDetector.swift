@@ -180,8 +180,11 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
             }
         }
 
-        DispatchQueue.main.async {
-            self.anomalousBundleIDs = currentlyAnomalous
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            if self.anomalousBundleIDs != currentlyAnomalous {
+                self.anomalousBundleIDs = currentlyAnomalous
+            }
         }
     }
 
