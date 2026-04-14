@@ -105,11 +105,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _, anomalousBundleIDs in
                 guard let self else { return }
-                if !anomalousBundleIDs.isEmpty {
-                    self.pendingAnomalyAlert = true
-                } else {
-                    self.pendingAnomalyAlert = false
-                }
+                self.pendingAnomalyAlert = !anomalousBundleIDs.isEmpty
                 self.updateIconTint()
             }
             .store(in: &cancellables)

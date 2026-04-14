@@ -1,6 +1,24 @@
 import AppKit
 import SwiftUI
 
+/// Computes the linear-regression slope over a memory sample set.
+/// x = elapsed seconds from the first sample, y = memoryMB.
+/// A positive slope indicates memory is trending upward.
+/// Returns 0 for fewer than one sample or when the denominator is zero.
+func linearRegressionSlope(_ samples: [(memoryMB: Double, timestamp: Date)]) -> Double {
+    guard let first = samples.first else { return 0 }
+    let n = Double(samples.count)
+    var sumX: Double = 0, sumY: Double = 0, sumXY: Double = 0, sumX2: Double = 0
+    for s in samples {
+        let x = s.timestamp.timeIntervalSince(first.timestamp)
+        let y = s.memoryMB
+        sumX += x; sumY += y; sumXY += x * y; sumX2 += x * x
+    }
+    let denominator = n * sumX2 - sumX * sumX
+    guard denominator != 0 else { return 0 }
+    return (n * sumXY - sumX * sumY) / denominator
+}
+
 /// An immutable snapshot of a single menu-bar process captured during one
 /// sampling tick by `ProcessMonitor`.
 ///

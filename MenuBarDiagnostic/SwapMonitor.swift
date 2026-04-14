@@ -195,21 +195,18 @@ class SwapMonitor: ObservableObject {
         }
     }
 
-    private func swapDelta() -> UInt64 {
-        guard swapSamples.count >= 2 else { return 0 }
-        // Use min-in-window rather than oldest to correctly capture growth even when
-        // swap partially releases mid-window before spiking again.
-        let minInWindow = swapSamples.min(by: { $0.bytes < $1.bytes })!.bytes
-        let newest = swapSamples.last!.bytes
+    /// Returns the net growth within a rolling window: newest minus the minimum observed value.
+    /// Uses min-in-window rather than oldest to correctly capture growth even when
+    /// the metric partially releases mid-window before spiking again.
+    private func windowDelta(samples: [(timestamp: Date, bytes: UInt64)]) -> UInt64 {
+        guard samples.count >= 2 else { return 0 }
+        let minInWindow = samples.min(by: { $0.bytes < $1.bytes })!.bytes
+        let newest = samples.last!.bytes
         return newest > minInWindow ? newest - minInWindow : 0
     }
 
-    private func compressedDelta() -> UInt64 {
-        guard compressedSamples.count >= 2 else { return 0 }
-        let minInWindow = compressedSamples.min(by: { $0.bytes < $1.bytes })!.bytes
-        let newest = compressedSamples.last!.bytes
-        return newest > minInWindow ? newest - minInWindow : 0
-    }
+    private func swapDelta() -> UInt64 { windowDelta(samples: swapSamples) }
+    private func compressedDelta() -> UInt64 { windowDelta(samples: compressedSamples) }
 
     private func refreshSwapState() {
         let sd = swapDelta()

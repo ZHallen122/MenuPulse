@@ -33,36 +33,33 @@ final class MenuBarDiagnosticTests: XCTestCase {
     // MARK: - linearRegressionSlope
 
     func testSlopePositiveForIncreasingMemory() {
-        let detector = AnomalyDetector(dataStore: DataStore(path: ":memory:"), prefs: PreferencesManager())
         let now = Date()
         let samples: [(memoryMB: Double, timestamp: Date)] = [
             (100, now),
             (150, now.addingTimeInterval(600)),
             (200, now.addingTimeInterval(1200))
         ]
-        XCTAssertGreaterThan(detector.linearRegressionSlope(samples), 0)
+        XCTAssertGreaterThan(linearRegressionSlope(samples), 0)
     }
 
     func testSlopeNegativeForDecreasingMemory() {
-        let detector = AnomalyDetector(dataStore: DataStore(path: ":memory:"), prefs: PreferencesManager())
         let now = Date()
         let samples: [(memoryMB: Double, timestamp: Date)] = [
             (200, now),
             (150, now.addingTimeInterval(600)),
             (100, now.addingTimeInterval(1200))
         ]
-        XCTAssertLessThan(detector.linearRegressionSlope(samples), 0)
+        XCTAssertLessThan(linearRegressionSlope(samples), 0)
     }
 
     func testSlopeZeroForFlatMemory() {
-        let detector = AnomalyDetector(dataStore: DataStore(path: ":memory:"), prefs: PreferencesManager())
         let now = Date()
         let samples: [(memoryMB: Double, timestamp: Date)] = [
             (100, now),
             (100, now.addingTimeInterval(600)),
             (100, now.addingTimeInterval(1200))
         ]
-        XCTAssertEqual(detector.linearRegressionSlope(samples), 0, accuracy: 0.0001)
+        XCTAssertEqual(linearRegressionSlope(samples), 0, accuracy: 0.0001)
     }
 
     // MARK: - DataStore: sample storage
@@ -867,8 +864,7 @@ final class MenuBarDiagnosticTests: XCTestCase {
     // MARK: - linearRegressionSlope: single sample returns 0.0 (denominator guard)
 
     func testLinearRegressionSlopeSingleSample() {
-        let detector = AnomalyDetector(dataStore: DataStore(path: ":memory:"), prefs: PreferencesManager())
-        let result = detector.linearRegressionSlope([(memoryMB: 100, timestamp: Date())])
+        let result = linearRegressionSlope([(memoryMB: 100, timestamp: Date())])
         XCTAssertEqual(result, 0.0, "linearRegressionSlope must return 0.0 for a single-sample array (denominator guard path)")
     }
 

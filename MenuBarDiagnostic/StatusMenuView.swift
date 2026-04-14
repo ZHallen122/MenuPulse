@@ -383,20 +383,6 @@ private struct ProcessRowView: View {
         return "Stable"
     }
 
-    private func linearRegressionSlope(_ samples: [(memoryMB: Double, timestamp: Date)]) -> Double {
-        guard let first = samples.first else { return 0 }
-        let n = Double(samples.count)
-        var sumX: Double = 0, sumY: Double = 0, sumXY: Double = 0, sumX2: Double = 0
-        for s in samples {
-            let x = s.timestamp.timeIntervalSince(first.timestamp)
-            let y = s.memoryMB
-            sumX += x; sumY += y; sumXY += x * y; sumX2 += x * x
-        }
-        let denominator = n * sumX2 - sumX * sumX
-        guard denominator != 0 else { return 0 }
-        return (n * sumXY - sumX * sumY) / denominator
-    }
-
     private func quitApp() {
         guard let bundleID = process.bundleIdentifier else { return }
         anomalyDetector.recordUserAction("quit", for: bundleID)

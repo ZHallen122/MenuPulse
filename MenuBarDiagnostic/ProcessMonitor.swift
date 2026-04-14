@@ -311,154 +311,8 @@ class ProcessMonitor: ObservableObject {
         // No need to sort here, ProcessListViewModel sorts it later.
         let sorted = newProcesses
 
-        // Persist every 5 s in testing mode (vs 30 s normally) so there are enough
-        // data points in the 2-minute trending window used by AnomalyDetector.
-        let persistInterval: TimeInterval = prefs.testingMode ? 5 : 30
-        if Date().timeIntervalSince(lastPersistTime) >= persistInterval {
-            dataStore.persistSamples(sorted)
-            dataStore.purgeOldSamples()
-            // Skip baseline recomputation in testing mode so the baseline stays frozen
-            // at pre-test levels; otherwise the baseline chases the spike and the
-            // anomaly multiplier threshold is never reached.
-            if !prefs.testingMode {
-                dataStore.recomputeBaselines()
-            }
-            lastPersistTime = Date()
-
-            // --- Per-app lifecycle management (section 6.6) ---
-            let now = Date()
-            let staleCutoff = now.addingTimeInterval(-30 * 24 * 3600)
-            dataStore.markStaleApps(lastSeenCutoff: staleCutoff)
-
-            var newUpdatesThisCycle: [String: String] = [:]
-
-            for process in sorted {
-                guard let bundleID = process.bundleIdentifier else { continue }
-
-                // Resolve current version from Info.plist via the running app's bundle.
-                let version: String? = bundleURLMap[bundleID].flatMap { url in
-                    Bundle(url: url)?.infoDictionary?["CFBundleShortVersionString"] as? String
-                }
-
-                if var cached = lifecycleCache[bundleID] {
-                    // Update cache timestamp for all running apps so they aren't evicted while active
-                    cached.lastSeen = now
-                    lifecycleCache[bundleID] = cached
-
-                    // App is known to us — check for version change or stale return.
-                    // Ignored apps are exempt from all automatic state transitions:
-                    // a user-curated ignore list must not be silently cleared by an update or dormancy.
-                    if cached.state == "ignored" {
-                        // No-op: stay ignored regardless of version change or stale flag.
-                    } else if let newVer = version, let cachedVer = cached.version, newVer != cachedVer {
-                        // Version changed: reset to learning_phase_1, announce update.
-                        dataStore.resetToLearning(bundleID: bundleID, version: version)
-                        cached = LifecycleEntry(state: "learning_phase_1", version: version, learningStartedAt: now, lastSeen: now)
-                        lifecycleCache[bundleID] = cached
-                        newUpdatesThisCycle[bundleID] = process.name
-                    } else if cached.state == "stale" {
-                        // App returning after a long absence: re-enter learning.
-                        dataStore.resetToLearning(bundleID: bundleID, version: version)
-                        cached = LifecycleEntry(state: "learning_phase_1",
-                                                version: version ?? cached.version,
-                                                learningStartedAt: now,
-                                                lastSeen: now)
-                        lifecycleCache[bundleID] = cached
-                    }
-                } else {
-                    // New to cache: query DataStore to see if we've seen this app before.
-                    if let entry = dataStore.lifecycleEntry(for: bundleID) {
-                        if entry.state == "ignored" {
-                            // Already ignored in DB (e.g., app restarted): restore ignored state.
-                            lifecycleCache[bundleID] = LifecycleEntry(state: "ignored",
-                                                                       version: entry.version,
-                                                                       learningStartedAt: nil,
-                                                                       lastSeen: now)
-                        } else if entry.state == "stale" {
-                            // Known but dormant: restart learning.
-                            dataStore.resetToLearning(bundleID: bundleID, version: version)
-                            lifecycleCache[bundleID] = LifecycleEntry(state: "learning_phase_1",
-                                                                       version: version ?? entry.version,
-                                                                       learningStartedAt: now,
-                                                                       lastSeen: now)
-                        } else {
-                            lifecycleCache[bundleID] = LifecycleEntry(state: entry.state,
-                                                                       version: entry.version,
-                                                                       learningStartedAt: entry.learningStartedAt,
-                                                                       lastSeen: now)
-                        }
-                    } else {
-                        // Brand new app: start learning clock now.
-                        dataStore.resetToLearning(bundleID: bundleID, version: version)
-                        lifecycleCache[bundleID] = LifecycleEntry(state: "learning_phase_1",
-                                                                   version: version,
-                                                                   learningStartedAt: now,
-                                                                   lastSeen: now)
-                    }
-                }
-
-                // Always persist last_seen_at + current state.
-                let entry = lifecycleCache[bundleID]!
-                dataStore.updateAppLifecycle(bundleID: bundleID,
-                                             state: entry.state,
-                                             version: entry.version ?? version,
-                                             lastSeen: now)
-            }
-
-            // Advance phases based on elapsed time since learning_started_at.
-            // Compute target phase directly from elapsed time — no step-by-step iteration.
-            var newPhaseMap: [String: String] = [:]
-            for bundleID in lifecycleCache.keys {
-                guard var entry = lifecycleCache[bundleID] else { continue }
-                guard entry.state.hasPrefix("learning_") else {
-                    // Non-learning states (active, ignored, stale) pass through unchanged.
-                    newPhaseMap[bundleID] = entry.state
-                    continue
-                }
-                let startedAt = entry.learningStartedAt ?? now
-                let elapsed = now.timeIntervalSince(startedAt)
-                let targetPhase: String
-                if elapsed < 4 * 3600 {
-                    targetPhase = "learning_phase_1"
-                } else if elapsed < 24 * 3600 {
-                    targetPhase = "learning_phase_2"
-                } else if elapsed < 3 * 86400 {
-                    targetPhase = "learning_phase_3"
-                } else {
-                    targetPhase = "active"
-                }
-                if targetPhase != entry.state {
-                    entry.state = targetPhase
-                    lifecycleCache[bundleID] = entry
-                    dataStore.updateAppLifecycle(bundleID: bundleID,
-                                                 state: targetPhase,
-                                                 version: entry.version,
-                                                 lastSeen: now)
-                }
-                newPhaseMap[bundleID] = targetPhase
-            }
-            // Evict entries not seen in the last 30 days so that when a stale app
-            // reappears the cache miss forces a fresh DB lookup (which will see the
-            // "stale" state written by markStaleApps) rather than reusing a stale
-            // "active" entry.
-            let staleEvictCutoff = now.addingTimeInterval(-30 * 24 * 3600)
-            lifecycleCache = lifecycleCache.filter { $0.value.lastSeen >= staleEvictCutoff }
-
-            currentBundleIDPhases = newPhaseMap
-
-            // Publish phase map and any new version-change events on the main queue.
-            let capturedPhases = newPhaseMap
-            let capturedUpdates = newUpdatesThisCycle
-            DispatchQueue.main.async { [weak self] in
-                guard let self = self else { return }
-                self.bundleIDPhases = capturedPhases
-                if !capturedUpdates.isEmpty {
-                    var merged = self.recentlyUpdatedApps
-                    merged.merge(capturedUpdates) { _, new in new }
-                    self.recentlyUpdatedApps = merged
-                }
-            }
-        }
+        // Persist samples and advance per-app lifecycle state on a throttled interval.
+        persistAndAdvanceLifecycle(processes: sorted, bundleURLMap: bundleURLMap)
 
         let cpuFrac = sampleSystemCPU()
         let (ramUsed, ramTotal, pressure) = sampleSystemRAM()
@@ -493,6 +347,161 @@ class ProcessMonitor: ObservableObject {
                     if self.systemRAMUsedBytes != ramUsed { self.systemRAMUsedBytes = ramUsed }
                     if self.systemRAMTotalBytes != ramTotal { self.systemRAMTotalBytes = ramTotal }
                 }
+            }
+        }
+    }
+
+    // MARK: - Lifecycle persistence
+
+    /// Persists process samples and advances per-app lifecycle phases.
+    ///
+    /// Runs on a throttled interval (30 s normally, 5 s in testing mode). Extracted
+    /// from `sampleOnQueue()` for readability; must only be called from `sampleQueue`.
+    private func persistAndAdvanceLifecycle(processes: [MenuBarProcess], bundleURLMap: [String: URL]) {
+        let persistInterval: TimeInterval = prefs.testingMode ? 5 : 30
+        guard Date().timeIntervalSince(lastPersistTime) >= persistInterval else { return }
+
+        dataStore.persistSamples(processes)
+        dataStore.purgeOldSamples()
+        // Skip baseline recomputation in testing mode so the baseline stays frozen
+        // at pre-test levels; otherwise the baseline chases the spike and the
+        // anomaly multiplier threshold is never reached.
+        if !prefs.testingMode {
+            dataStore.recomputeBaselines()
+        }
+        lastPersistTime = Date()
+
+        // --- Per-app lifecycle management (section 6.6) ---
+        let now = Date()
+        let staleCutoff = now.addingTimeInterval(-30 * 24 * 3600)
+        dataStore.markStaleApps(lastSeenCutoff: staleCutoff)
+
+        var newUpdatesThisCycle: [String: String] = [:]
+
+        for process in processes {
+            guard let bundleID = process.bundleIdentifier else { continue }
+
+            // Resolve current version from Info.plist via the running app's bundle.
+            let version: String? = bundleURLMap[bundleID].flatMap { url in
+                Bundle(url: url)?.infoDictionary?["CFBundleShortVersionString"] as? String
+            }
+
+            if var cached = lifecycleCache[bundleID] {
+                // Update cache timestamp for all running apps so they aren't evicted while active
+                cached.lastSeen = now
+                lifecycleCache[bundleID] = cached
+
+                // App is known to us — check for version change or stale return.
+                // Ignored apps are exempt from all automatic state transitions:
+                // a user-curated ignore list must not be silently cleared by an update or dormancy.
+                if cached.state == "ignored" {
+                    // No-op: stay ignored regardless of version change or stale flag.
+                } else if let newVer = version, let cachedVer = cached.version, newVer != cachedVer {
+                    // Version changed: reset to learning_phase_1, announce update.
+                    dataStore.resetToLearning(bundleID: bundleID, version: version)
+                    cached = LifecycleEntry(state: "learning_phase_1", version: version, learningStartedAt: now, lastSeen: now)
+                    lifecycleCache[bundleID] = cached
+                    newUpdatesThisCycle[bundleID] = process.name
+                } else if cached.state == "stale" {
+                    // App returning after a long absence: re-enter learning.
+                    dataStore.resetToLearning(bundleID: bundleID, version: version)
+                    cached = LifecycleEntry(state: "learning_phase_1",
+                                            version: version ?? cached.version,
+                                            learningStartedAt: now,
+                                            lastSeen: now)
+                    lifecycleCache[bundleID] = cached
+                }
+            } else {
+                // New to cache: query DataStore to see if we've seen this app before.
+                if let entry = dataStore.lifecycleEntry(for: bundleID) {
+                    if entry.state == "ignored" {
+                        // Already ignored in DB (e.g., app restarted): restore ignored state.
+                        lifecycleCache[bundleID] = LifecycleEntry(state: "ignored",
+                                                                   version: entry.version,
+                                                                   learningStartedAt: nil,
+                                                                   lastSeen: now)
+                    } else if entry.state == "stale" {
+                        // Known but dormant: restart learning.
+                        dataStore.resetToLearning(bundleID: bundleID, version: version)
+                        lifecycleCache[bundleID] = LifecycleEntry(state: "learning_phase_1",
+                                                                   version: version ?? entry.version,
+                                                                   learningStartedAt: now,
+                                                                   lastSeen: now)
+                    } else {
+                        lifecycleCache[bundleID] = LifecycleEntry(state: entry.state,
+                                                                   version: entry.version,
+                                                                   learningStartedAt: entry.learningStartedAt,
+                                                                   lastSeen: now)
+                    }
+                } else {
+                    // Brand new app: start learning clock now.
+                    dataStore.resetToLearning(bundleID: bundleID, version: version)
+                    lifecycleCache[bundleID] = LifecycleEntry(state: "learning_phase_1",
+                                                               version: version,
+                                                               learningStartedAt: now,
+                                                               lastSeen: now)
+                }
+            }
+
+            // Always persist last_seen_at + current state.
+            let entry = lifecycleCache[bundleID]!
+            dataStore.updateAppLifecycle(bundleID: bundleID,
+                                         state: entry.state,
+                                         version: entry.version ?? version,
+                                         lastSeen: now)
+        }
+
+        // Advance phases based on elapsed time since learning_started_at.
+        // Compute target phase directly from elapsed time — no step-by-step iteration.
+        var newPhaseMap: [String: String] = [:]
+        for bundleID in lifecycleCache.keys {
+            guard var entry = lifecycleCache[bundleID] else { continue }
+            guard entry.state.hasPrefix("learning_") else {
+                // Non-learning states (active, ignored, stale) pass through unchanged.
+                newPhaseMap[bundleID] = entry.state
+                continue
+            }
+            let startedAt = entry.learningStartedAt ?? now
+            let elapsed = now.timeIntervalSince(startedAt)
+            let targetPhase: String
+            if elapsed < 4 * 3600 {
+                targetPhase = "learning_phase_1"
+            } else if elapsed < 24 * 3600 {
+                targetPhase = "learning_phase_2"
+            } else if elapsed < 3 * 86400 {
+                targetPhase = "learning_phase_3"
+            } else {
+                targetPhase = "active"
+            }
+            if targetPhase != entry.state {
+                entry.state = targetPhase
+                lifecycleCache[bundleID] = entry
+                dataStore.updateAppLifecycle(bundleID: bundleID,
+                                             state: targetPhase,
+                                             version: entry.version,
+                                             lastSeen: now)
+            }
+            newPhaseMap[bundleID] = targetPhase
+        }
+        // Evict entries not seen in the last 30 days so that when a stale app
+        // reappears the cache miss forces a fresh DB lookup (which will see the
+        // "stale" state written by markStaleApps) rather than reusing a stale
+        // "active" entry.
+        let staleEvictCutoff = now.addingTimeInterval(-30 * 24 * 3600)
+        lifecycleCache = lifecycleCache.filter { $0.value.lastSeen >= staleEvictCutoff }
+
+        currentBundleIDPhases = newPhaseMap
+
+        // Publish phase map and any new version-change events on the main queue.
+        let capturedPhases = newPhaseMap
+        let capturedUpdates = newUpdatesThisCycle
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.bundleIDPhases = capturedPhases
+            if !capturedUpdates.isEmpty {
+                var merged = self.recentlyUpdatedApps
+                merged.merge(capturedUpdates) { _, new in new }
+                self.recentlyUpdatedApps = merged
             }
         }
     }
