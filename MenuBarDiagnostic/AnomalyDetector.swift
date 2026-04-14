@@ -78,6 +78,7 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
 
         var liveBundleIDs = Set<String>()
         var currentlyAnomalous = Set<String>()
+        let sensitivityMultiplier = prefs.sensitivity.anomalyMultiplier
 
         for process in processes {
             autoreleasepool {
@@ -97,7 +98,7 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
                 case "learning_phase_1": useMedian = true;  phaseMultiplier = 4.0
                 case "learning_phase_2": useMedian = true;  phaseMultiplier = 3.0
                 case "learning_phase_3": useMedian = false; phaseMultiplier = 2.5
-                default:                 useMedian = false; phaseMultiplier = prefs.sensitivity.anomalyMultiplier
+                default:                 useMedian = false; phaseMultiplier = sensitivityMultiplier
                 }
 
                 // 30-sample minimum: icon can tint but notification is suppressed below this.
@@ -179,8 +180,11 @@ final class AnomalyDetector: NSObject, ObservableObject, UNUserNotificationCente
             }
         }
 
-        DispatchQueue.main.async {
-            self.anomalousBundleIDs = currentlyAnomalous
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            if self.anomalousBundleIDs != currentlyAnomalous {
+                self.anomalousBundleIDs = currentlyAnomalous
+            }
         }
     }
 

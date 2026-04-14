@@ -18,7 +18,7 @@ extension Notification.Name {
 ///   anomaly alert) → green (all clear).
 /// - Managing the settings window lifecycle (single-instance, re-use on re-open).
 /// - Applying and observing the launch-at-login preference via `SMAppService`.
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
     private var hudWindow: HUDWindow?
@@ -27,6 +27,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var cancellables = Set<AnyCancellable>()
     private(set) var pendingAnomalyAlert = false
     private var testIconColor: String = "normal"
+    private var currentIconColor: NSColor?
     private lazy var baseIcon: NSImage = {
         if let img = NSImage(systemSymbolName: "stethoscope", accessibilityDescription: "Bouncer") { return img }
         NSLog("Bouncer: stethoscope system symbol unavailable; falling back to app icon")
@@ -38,6 +39,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var anomalyDetector: AnomalyDetector = AnomalyDetector(dataStore: monitor.dataStore, prefs: prefs)
     lazy var swapMonitor = SwapMonitor()
     lazy var sparkleUpdater = SparkleUpdater()
+    lazy var processListViewModel: ProcessListViewModel = ProcessListViewModel(
+        monitor: monitor,
+        anomalyDetector: anomalyDetector,
+        prefs: prefs
+    )
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -55,7 +61,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupNotifications()
         monitor.startMonitoring()
         swapMonitor.startMonitoring()
-        swapMonitor.topProcessProvider = { [weak self] in self?.monitor.processes ?? [] }
+        swapMonitor.topProcessProvider = { [weak self] in self?.monitor.currentProcesses ?? [] }
 
         // Update menu bar title: show RAM % when enabled, otherwise blank.
         Publishers.CombineLatest(monitor.$systemRAMUsedBytes, monitor.$systemRAMTotalBytes)
@@ -204,6 +210,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             prefs: prefs,
             anomalyDetector: anomalyDetector,
             swapMonitor: swapMonitor,
+            viewModel: processListViewModel,
             onSettingsTap: { [weak self] in self?.openSettings() },
             onHistoryTap: { [weak self] in self?.openHistory() },
             onClosePopover: { [weak self] in self?.popover?.performClose(nil) }
@@ -212,7 +219,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         pop.contentViewController = vc
         pop.contentSize = NSSize(width: 300, height: 400)
         pop.behavior = .transient
+        pop.delegate = self
         self.popover = pop
+    }
+
+    // MARK: - NSPopoverDelegate
+    
+    func popoverWillShow(_ notification: Notification) {
+        processListViewModel.isPopoverVisible = true
+        monitor.isUIVisible = true
+    }
+    
+    func popoverDidClose(_ notification: Notification) {
+        processListViewModel.isPopoverVisible = false
+        updateMonitorVisibility()
     }
 
     func openSettings() {
@@ -272,6 +292,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             color = iconColor(swapState: swapMonitor.swapState, pendingAnomalyAlert: pendingAnomalyAlert)
         }
 
+        guard color != currentIconColor else { return }
+        currentIconColor = color
+
         if color == .systemGreen {
             baseIcon.isTemplate = true
             statusItem?.button?.image = baseIcon
@@ -304,9 +327,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if prefs.showMemoryPressureInMenuBar {
             let used = monitor.systemRAMUsedBytes
             let total = monitor.systemRAMTotalBytes
-            button.title = total > 0 ? "\(Int((Double(used) / Double(total) * 100).rounded()))%" : ""
+            let newTitle = total > 0 ? "\(Int((Double(used) / Double(total) * 100).rounded()))%" : ""
+            if button.title != newTitle {
+                button.title = newTitle
+            }
         } else {
-            button.title = ""
+            if button.title != "" {
+                button.title = ""
+            }
         }
     }
 
@@ -323,5 +351,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             hud.makeKeyAndOrderFront(nil)
             hudWindow = hud
         }
+        updateMonitorVisibility()
+    }
+
+    private func updateMonitorVisibility() {
+        let popoverVisible = popover?.isShown ?? false
+        let hudVisible = hudWindow?.isVisible ?? false
+        monitor.isUIVisible = popoverVisible || hudVisible
     }
 }

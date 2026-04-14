@@ -14,6 +14,20 @@ class ProcessMonitor: ObservableObject {
     /// alphabetically by name. Updated on the main queue after each sample tick.
     @Published var processes: [MenuBarProcess] = []
 
+    /// Raw list of processes updated every tick, regardless of UI visibility.
+    /// Used by background observers (e.g. SwapMonitor) without triggering UI renders.
+    private(set) var currentProcesses: [MenuBarProcess] = []
+
+    /// Whether the UI is currently visible (Popover or HUD is open).
+    /// Updated by AppDelegate to prevent unnecessary `@Published` state mutations.
+    var isUIVisible: Bool = false {
+        didSet {
+            if isUIVisible && !oldValue {
+                self.processes = self.currentProcesses
+            }
+        }
+    }
+
     /// System-wide CPU utilisation as a fraction in `[0, 1]`, computed from
     /// `host_statistics(HOST_CPU_LOAD_INFO)` tick deltas (user + sys + nice).
     /// Returns `0` until the second sample, when a delta can be calculated.
@@ -78,6 +92,26 @@ class ProcessMonitor: ObservableObject {
     /// off the main thread and serialised, avoiding data races.
     private let sampleQueue = DispatchQueue(label: "com.bouncer.sampling", qos: .utility)
 
+    // MARK: - Static app property cache (accessed only on sampleQueue)
+
+    private struct AppStaticProperties {
+        let name: String
+        let bundleIdentifier: String?
+        let bundleURL: URL?
+        let icon: NSImage?
+        let launchDate: Date?
+        let activationPolicy: NSApplication.ActivationPolicy
+    }
+
+    private enum AppStaticCacheResult {
+        case notAnApp
+        case app(AppStaticProperties)
+    }
+
+    /// Per-PID cache of static NSRunningApplication properties (don't change for a given PID).
+    /// Populated on first encounter; pruned when the PID disappears from livePIDs.
+    private var appStaticCache: [pid_t: AppStaticCacheResult] = [:]
+
     // MARK: - Per-app lifecycle cache (accessed only on sampleQueue)
 
     private struct LifecycleEntry {
@@ -130,29 +164,61 @@ class ProcessMonitor: ObservableObject {
         }
     }
 
+    private func getActivePIDsFast() -> [pid_t] {
+        let type = UInt32(PROC_ALL_PIDS)
+        let bufferSize = proc_listpids(type, 0, nil, 0)
+        let paddedSize = bufferSize + Int32(MemoryLayout<pid_t>.stride * 50)
+        guard paddedSize > 0 else { return [] }
+        
+        var pids = [pid_t](repeating: 0, count: Int(paddedSize) / MemoryLayout<pid_t>.stride)
+        let bytesRead = proc_listpids(type, 0, &pids, paddedSize)
+        guard bytesRead > 0 else { return [] }
+        
+        let actualCount = Int(bytesRead) / MemoryLayout<pid_t>.stride
+        return Array(pids.prefix(actualCount))
+    }
+
     private func sampleOnQueue() {
         let thermalState = ProcessInfo.processInfo.thermalState
         let wallNow = DispatchTime.now().uptimeNanoseconds
 
-        // Include all user-visible processes (regular and accessory; excludes
-        // background-only daemons with `.prohibited` policy).
-        let accessoryApps = NSWorkspace.shared.runningApplications.filter {
-            $0.activationPolicy != .prohibited
-        }
-
-        // Build bundleID → bundleURL map for version lookups during persist.
+        let currentPIDs = getActivePIDsFast()
+        let activePIDsSet = Set(currentPIDs)
         var bundleURLMap: [String: URL] = [:]
-        for app in accessoryApps {
-            if let bid = app.bundleIdentifier, let url = app.bundleURL {
-                bundleURLMap[bid] = url
-            }
-        }
-
         var newProcesses: [MenuBarProcess] = []
 
-        for app in accessoryApps {
-            let pid = app.processIdentifier
+        for pid in currentPIDs {
             guard pid > 0 else { continue }
+
+            let staticProps: AppStaticProperties
+            if let result = appStaticCache[pid] {
+                switch result {
+                case .notAnApp: continue
+                case .app(let props): staticProps = props
+                }
+            } else {
+                guard let app = NSRunningApplication(processIdentifier: pid) else {
+                    appStaticCache[pid] = .notAnApp
+                    continue
+                }
+                let props = AppStaticProperties(
+                    name: app.localizedName ?? "Unknown",
+                    bundleIdentifier: app.bundleIdentifier,
+                    bundleURL: app.bundleURL,
+                    icon: app.icon,
+                    launchDate: app.launchDate,
+                    activationPolicy: app.activationPolicy
+                )
+                appStaticCache[pid] = .app(props)
+                staticProps = props
+            }
+
+            // Exclude background-only daemons with `.prohibited` policy
+            guard staticProps.activationPolicy != .prohibited else { continue }
+
+            if let bid = staticProps.bundleIdentifier, let url = staticProps.bundleURL {
+                bundleURLMap[bid] = url
+            }
 
             var info = proc_taskinfo()
             let infoSize = Int32(MemoryLayout<proc_taskinfo>.size)
@@ -218,15 +284,15 @@ class ProcessMonitor: ObservableObject {
 
             newProcesses.append(MenuBarProcess(
                 pid: pid,
-                name: app.localizedName ?? "Unknown",
-                bundleIdentifier: app.bundleIdentifier,
-                icon: app.icon,
+                name: staticProps.name,
+                bundleIdentifier: staticProps.bundleIdentifier,
+                icon: staticProps.icon,
                 cpuFraction: cpuFraction,
                 cpuHistory: history,
                 memoryHistory: memHistory,
                 memoryFootprintBytes: memFootprint,
                 thermalState: thermalState,
-                launchDate: app.launchDate
+                launchDate: staticProps.launchDate
             ))
         }
 
@@ -235,8 +301,14 @@ class ProcessMonitor: ObservableObject {
         previousSamples = previousSamples.filter { livePIDs.contains($0.key) }
         cpuHistories = cpuHistories.filter { livePIDs.contains($0.key) }
         memoryHistories = memoryHistories.filter { livePIDs.contains($0.key) }
+        
+        let deadPIDs = Set(appStaticCache.keys).subtracting(activePIDsSet)
+        for deadPid in deadPIDs {
+            appStaticCache.removeValue(forKey: deadPid)
+        }
 
-        let sorted = newProcesses.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        // No need to sort here, ProcessListViewModel sorts it later.
+        let sorted = newProcesses
 
         // Persist every 5 s in testing mode (vs 30 s normally) so there are enough
         // data points in the 2-minute trending window used by AnomalyDetector.
@@ -396,11 +468,31 @@ class ProcessMonitor: ObservableObject {
 
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            self.processes = sorted
-            self.systemCPUFraction = cpuFrac
-            self.systemRAMUsedBytes = ramUsed
-            self.systemRAMTotalBytes = ramTotal
-            self.memoryPressure = pressure
+            self.currentProcesses = sorted
+            
+            // Limit SwiftUI objectWillChange firings by doing equality checks
+            if self.isUIVisible {
+                self.processes = sorted
+                if self.systemCPUFraction != cpuFrac { self.systemCPUFraction = cpuFrac }
+                if self.systemRAMUsedBytes != ramUsed { self.systemRAMUsedBytes = ramUsed }
+                if self.systemRAMTotalBytes != ramTotal { self.systemRAMTotalBytes = ramTotal }
+                if self.memoryPressure != pressure { self.memoryPressure = pressure }
+            } else {
+                // When UI is hidden, throttle memory updates to only when menu bar % changes
+                if self.memoryPressure != pressure { self.memoryPressure = pressure }
+                
+                if ramTotal > 0 && self.systemRAMTotalBytes > 0 {
+                    let oldPerc = Int((Double(self.systemRAMUsedBytes) / Double(self.systemRAMTotalBytes) * 100).rounded())
+                    let newPerc = Int((Double(ramUsed) / Double(ramTotal) * 100).rounded())
+                    if oldPerc != newPerc {
+                        self.systemRAMUsedBytes = ramUsed
+                        self.systemRAMTotalBytes = ramTotal
+                    }
+                } else {
+                    if self.systemRAMUsedBytes != ramUsed { self.systemRAMUsedBytes = ramUsed }
+                    if self.systemRAMTotalBytes != ramTotal { self.systemRAMTotalBytes = ramTotal }
+                }
+            }
         }
     }
 

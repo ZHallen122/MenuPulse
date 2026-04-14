@@ -45,6 +45,12 @@ final class DataStore {
     private let queue = DispatchQueue(label: "com.mbdiag.datastore")
     private var db: OpaquePointer?
 
+    private var cachedBaselineStmt: OpaquePointer?
+    private var cachedSampleCountStmt: OpaquePointer?
+    private var cachedAppStateStmt: OpaquePointer?
+    private var cachedLifecycleEntryStmt: OpaquePointer?
+    private var cachedRecentSamplesStmt: OpaquePointer?
+
     init() {
         queue.async { [weak self] in
             self?.openDatabase()
@@ -59,6 +65,7 @@ final class DataStore {
             var dbPtr: OpaquePointer?
             if sqlite3_open(path, &dbPtr) == SQLITE_OK {
                 self?.db = dbPtr
+                sqlite3_exec(dbPtr, "PRAGMA journal_mode=WAL;", nil, nil, nil)
             } else {
                 NSLog("DataStore: sqlite3_open failed for path %@: %@", path, String(cString: sqlite3_errmsg(dbPtr)))
             }
@@ -67,6 +74,11 @@ final class DataStore {
     }
 
     deinit {
+        if let stmt = cachedBaselineStmt { sqlite3_finalize(stmt) }
+        if let stmt = cachedSampleCountStmt { sqlite3_finalize(stmt) }
+        if let stmt = cachedAppStateStmt { sqlite3_finalize(stmt) }
+        if let stmt = cachedLifecycleEntryStmt { sqlite3_finalize(stmt) }
+        if let stmt = cachedRecentSamplesStmt { sqlite3_finalize(stmt) }
         if let db = db { sqlite3_close(db) }
     }
 
@@ -256,6 +268,8 @@ final class DataStore {
         if sqlite3_open(dbPath, &db) != SQLITE_OK {
             NSLog("DataStore: sqlite3_open failed for path %@: %@", dbPath, String(cString: sqlite3_errmsg(db)))
             db = nil
+        } else {
+            sqlite3_exec(db, "PRAGMA journal_mode=WAL;", nil, nil, nil)
         }
     }
 
@@ -436,6 +450,20 @@ final class DataStore {
         }
         defer { sqlite3_finalize(stmt) }
 
+        // Increment sample_count for each unique bundle ID seen this tick.
+        let countSQL = """
+            INSERT INTO app_lifecycle (bundle_id, sample_count) VALUES (?, 1)
+            ON CONFLICT(bundle_id) DO UPDATE SET sample_count = sample_count + 1;
+            """
+        var countStmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, countSQL, -1, &countStmt, nil) == SQLITE_OK else {
+            NSLog("DataStore: sqlite3_prepare_v2 failed in insertSamples (count): %@", String(cString: sqlite3_errmsg(db)))
+            return
+        }
+        defer { sqlite3_finalize(countStmt) }
+
+        sqlite3_exec(db, "BEGIN IMMEDIATE;", nil, nil, nil)
+
         var seenBundleIDs = Set<String>()
         for process in processes {
             let bundleID = process.bundleIdentifier ?? "unknown"
@@ -458,17 +486,6 @@ final class DataStore {
             seenBundleIDs.insert(bundleID)
         }
 
-        // Increment sample_count for each unique bundle ID seen this tick.
-        let countSQL = """
-            INSERT INTO app_lifecycle (bundle_id, sample_count) VALUES (?, 1)
-            ON CONFLICT(bundle_id) DO UPDATE SET sample_count = sample_count + 1;
-            """
-        var countStmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, countSQL, -1, &countStmt, nil) == SQLITE_OK else {
-            NSLog("DataStore: sqlite3_prepare_v2 failed in insertSamples (count): %@", String(cString: sqlite3_errmsg(db)))
-            return
-        }
-        defer { sqlite3_finalize(countStmt) }
         for bundleID in seenBundleIDs {
             sqlite3_bind_text(countStmt, 1, (bundleID as NSString).utf8String, -1, nil)
             let crc = sqlite3_step(countStmt)
@@ -477,6 +494,8 @@ final class DataStore {
             }
             sqlite3_reset(countStmt)
         }
+
+        sqlite3_exec(db, "COMMIT;", nil, nil, nil)
     }
 
     private func deleteStaleSamples() {
@@ -588,19 +607,20 @@ final class DataStore {
         }
     }
 
-    private func queryRecentSamples(for bundleID: String, since: Date) -> [(memoryMB: Double, timestamp: Date)] {
-        guard let db = db else { return [] }
-        let cutoff = Int64(since.timeIntervalSince1970)
+    private func getRecentSamplesStmt() -> OpaquePointer? {
+        if let stmt = cachedRecentSamplesStmt { return stmt }
+        guard let db = db else { return nil }
         let sql = "SELECT memory_mb, sampled_at FROM memory_samples WHERE bundle_id = ? AND sampled_at >= ? ORDER BY sampled_at ASC;"
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-            NSLog("DataStore: sqlite3_prepare_v2 failed in queryRecentSamples: %@", String(cString: sqlite3_errmsg(db)))
-            return []
-        }
-        defer { sqlite3_finalize(stmt) }
+        if sqlite3_prepare_v2(db, sql, -1, &cachedRecentSamplesStmt, nil) != SQLITE_OK { return nil }
+        return cachedRecentSamplesStmt
+    }
+
+    private func queryRecentSamples(for bundleID: String, since: Date) -> [(memoryMB: Double, timestamp: Date)] {
+        guard let stmt = getRecentSamplesStmt() else { return [] }
+        defer { sqlite3_reset(stmt); sqlite3_clear_bindings(stmt) }
+        let cutoff = Int64(since.timeIntervalSince1970)
         if sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil) != SQLITE_OK ||
            sqlite3_bind_int64(stmt, 2, cutoff) != SQLITE_OK {
-            NSLog("DataStore: bind failed in queryRecentSamples: %@", String(cString: sqlite3_errmsg(db)))
             return []
         }
         var rows: [(memoryMB: Double, timestamp: Date)] = []
@@ -612,32 +632,35 @@ final class DataStore {
         return rows
     }
 
-    private func queryBaseline(for bundleID: String) -> (avgMB: Double, medianMB: Double, p90MB: Double)? {
+    private func getBaselineStmt() -> OpaquePointer? {
+        if let stmt = cachedBaselineStmt { return stmt }
         guard let db = db else { return nil }
         let sql = "SELECT avg_mb, median_mb, p90_mb FROM daily_baselines WHERE bundle_id = ? ORDER BY date DESC LIMIT 1;"
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-            NSLog("DataStore: sqlite3_prepare_v2 failed in queryBaseline: %@", String(cString: sqlite3_errmsg(db)))
-            return nil
-        }
-        defer { sqlite3_finalize(stmt) }
+        if sqlite3_prepare_v2(db, sql, -1, &cachedBaselineStmt, nil) != SQLITE_OK { return nil }
+        return cachedBaselineStmt
+    }
+
+    private func queryBaseline(for bundleID: String) -> (avgMB: Double, medianMB: Double, p90MB: Double)? {
+        guard let stmt = getBaselineStmt() else { return nil }
+        defer { sqlite3_reset(stmt); sqlite3_clear_bindings(stmt) }
         if sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil) != SQLITE_OK {
-            NSLog("DataStore: bind failed in queryBaseline: %@", String(cString: sqlite3_errmsg(db)))
             return nil
         }
         guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
         return (sqlite3_column_double(stmt, 0), sqlite3_column_double(stmt, 1), sqlite3_column_double(stmt, 2))
     }
 
-    private func querySampleCount(for bundleID: String) -> Int {
-        guard let db = db else { return 0 }
+    private func getSampleCountStmt() -> OpaquePointer? {
+        if let stmt = cachedSampleCountStmt { return stmt }
+        guard let db = db else { return nil }
         let sql = "SELECT sample_count FROM app_lifecycle WHERE bundle_id = ?;"
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-            NSLog("DataStore: prepare failed in querySampleCount: %@", String(cString: sqlite3_errmsg(db)))
-            return 0
-        }
-        defer { sqlite3_finalize(stmt) }
+        if sqlite3_prepare_v2(db, sql, -1, &cachedSampleCountStmt, nil) != SQLITE_OK { return nil }
+        return cachedSampleCountStmt
+    }
+
+    private func querySampleCount(for bundleID: String) -> Int {
+        guard let stmt = getSampleCountStmt() else { return 0 }
+        defer { sqlite3_reset(stmt); sqlite3_clear_bindings(stmt) }
         guard sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil) == SQLITE_OK else { return 0 }
         guard sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
         return Int(sqlite3_column_int(stmt, 0))
@@ -645,30 +668,34 @@ final class DataStore {
 
     // MARK: - Lifecycle private helpers
 
-    private func queryAppState(for bundleID: String) -> String {
-        guard let db = db else { return "learning_phase_1" }
+    private func getAppStateStmt() -> OpaquePointer? {
+        if let stmt = cachedAppStateStmt { return stmt }
+        guard let db = db else { return nil }
         let sql = "SELECT state FROM app_lifecycle WHERE bundle_id = ?;"
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-            NSLog("DataStore: prepare failed in queryAppState: %@", String(cString: sqlite3_errmsg(db)))
-            return "learning_phase_1"
-        }
-        defer { sqlite3_finalize(stmt) }
+        if sqlite3_prepare_v2(db, sql, -1, &cachedAppStateStmt, nil) != SQLITE_OK { return nil }
+        return cachedAppStateStmt
+    }
+
+    private func queryAppState(for bundleID: String) -> String {
+        guard let stmt = getAppStateStmt() else { return "learning_phase_1" }
+        defer { sqlite3_reset(stmt); sqlite3_clear_bindings(stmt) }
         guard sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil) == SQLITE_OK else { return "learning_phase_1" }
         guard sqlite3_step(stmt) == SQLITE_ROW else { return "learning_phase_1" }
         guard let ptr = sqlite3_column_text(stmt, 0) else { return "learning_phase_1" }
         return String(cString: ptr)
     }
 
-    private func queryLifecycleEntry(for bundleID: String) -> (state: String, version: String?, learningStartedAt: Date?)? {
+    private func getLifecycleEntryStmt() -> OpaquePointer? {
+        if let stmt = cachedLifecycleEntryStmt { return stmt }
         guard let db = db else { return nil }
         let sql = "SELECT state, version, learning_started_at FROM app_lifecycle WHERE bundle_id = ?;"
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-            NSLog("DataStore: prepare failed in queryLifecycleEntry: %@", String(cString: sqlite3_errmsg(db)))
-            return nil
-        }
-        defer { sqlite3_finalize(stmt) }
+        if sqlite3_prepare_v2(db, sql, -1, &cachedLifecycleEntryStmt, nil) != SQLITE_OK { return nil }
+        return cachedLifecycleEntryStmt
+    }
+
+    private func queryLifecycleEntry(for bundleID: String) -> (state: String, version: String?, learningStartedAt: Date?)? {
+        guard let stmt = getLifecycleEntryStmt() else { return nil }
+        defer { sqlite3_reset(stmt); sqlite3_clear_bindings(stmt) }
         guard sqlite3_bind_text(stmt, 1, (bundleID as NSString).utf8String, -1, nil) == SQLITE_OK else { return nil }
         guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
         let state = sqlite3_column_text(stmt, 0).map { String(cString: $0) } ?? "learning_phase_1"

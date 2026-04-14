@@ -1,11 +1,83 @@
 import SwiftUI
 import AppKit
+import Combine
+
+// MARK: - ProcessListViewModel
+
+/// Computes the filtered and sorted process list off the main thread.
+///
+/// Observes `ProcessMonitor.processes`, `AnomalyDetector.anomalousBundleIDs`, and
+/// `PreferencesManager.ignoredBundleIDsRaw` via Combine, applies the filter/sort on a
+/// background queue, and publishes the result back on the main queue so that SwiftUI
+/// views avoid doing this work on every render cycle.
+final class ProcessListViewModel: ObservableObject {
+    @Published var displayProcesses: [MenuBarProcess] = []
+    
+    var isPopoverVisible: Bool = false {
+        didSet {
+            if isPopoverVisible && displayProcesses != latestComputedProcesses {
+                displayProcesses = latestComputedProcesses
+            }
+        }
+    }
+
+    private var latestComputedProcesses: [MenuBarProcess] = []
+    private var cancellables = Set<AnyCancellable>()
+
+    init(monitor: ProcessMonitor, anomalyDetector: AnomalyDetector, prefs: PreferencesManager) {
+        let ignoredPublisher = NotificationCenter.default
+            .publisher(for: UserDefaults.didChangeNotification)
+            .map { _ in prefs.ignoredBundleIDsRaw }
+            .prepend(prefs.ignoredBundleIDsRaw)
+            .removeDuplicates()
+
+        Publishers.CombineLatest3(
+            monitor.$processes,
+            anomalyDetector.$anomalousBundleIDs,
+            ignoredPublisher
+        )
+        .receive(on: DispatchQueue.global(qos: .userInitiated))
+        .map { processes, anomalousBundleIDs, ignoredRaw -> [MenuBarProcess] in
+            let ignored = Set(
+                ignoredRaw
+                    .split(separator: ",")
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                    .filter { !$0.isEmpty }
+            )
+            let sorted = processes
+                .filter { process in
+                    guard let bid = process.bundleIdentifier else { return true }
+                    return !ignored.contains(bid)
+                }
+                .sorted { p1, p2 in
+                    let a1 = anomalousBundleIDs.contains(p1.bundleIdentifier ?? "")
+                    let a2 = anomalousBundleIDs.contains(p2.bundleIdentifier ?? "")
+                    if a1 && !a2 { return true }
+                    if !a1 && a2 { return false }
+                    return p1.memoryFootprintBytes > p2.memoryFootprintBytes
+                }
+            return Array(sorted.prefix(15))
+        }
+        .receive(on: DispatchQueue.main)
+        .sink { [weak self] newProcesses in
+            guard let self = self else { return }
+            self.latestComputedProcesses = newProcesses
+            if self.isPopoverVisible {
+                self.displayProcesses = newProcesses
+            }
+        }
+        .store(in: &cancellables)
+    }
+}
+
+// MARK: - StatusMenuView
 
 struct StatusMenuView: View {
     @ObservedObject var monitor: ProcessMonitor
     @ObservedObject var prefs: PreferencesManager
     @ObservedObject var anomalyDetector: AnomalyDetector
     @ObservedObject var swapMonitor: SwapMonitor
+    @ObservedObject var viewModel: ProcessListViewModel
     var onSettingsTap: () -> Void
     var onHistoryTap: () -> Void = {}
     var onClosePopover: () -> Void = {}
@@ -28,7 +100,7 @@ struct StatusMenuView: View {
     // MARK: - Summary Header
 
     private var summaryHeader: some View {
-        let appCount = displayProcesses.count
+        let appCount = viewModel.displayProcesses.count
         let anomalyCount = anomalyDetector.anomalousBundleIDs.count
         return VStack(alignment: .leading, spacing: 2) {
             Text("\(appCount) app\(appCount == 1 ? "" : "s") running")
@@ -91,24 +163,6 @@ struct StatusMenuView: View {
 
     // MARK: - Process Sections
 
-    private var displayProcesses: [MenuBarProcess] {
-        let ignored = Set(prefs.ignoredBundleIDs)
-        return monitor.processes
-            .filter { process in
-                guard let bid = process.bundleIdentifier else { return true }
-                return !ignored.contains(bid)
-            }
-            .sorted { p1, p2 in
-                let a1 = anomalyDetector.anomalousBundleIDs.contains(p1.bundleIdentifier ?? "")
-                let a2 = anomalyDetector.anomalousBundleIDs.contains(p2.bundleIdentifier ?? "")
-
-                if a1 && !a2 { return true }
-                if !a1 && a2 { return false }
-
-                return p1.memoryFootprintBytes > p2.memoryFootprintBytes
-            }
-    }
-
     @ViewBuilder
     private var processListOrEmpty: some View {
         if monitor.processes.isEmpty {
@@ -128,7 +182,7 @@ struct StatusMenuView: View {
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
-                    ForEach(displayProcesses) { process in
+                    ForEach(viewModel.displayProcesses) { process in
                         let isAnomalous = anomalyDetector.anomalousBundleIDs.contains(process.bundleIdentifier ?? "")
                         ProcessRowView(
                             process: process,
@@ -370,5 +424,6 @@ private struct ProcessRowView: View {
     let monitor = ProcessMonitor(prefs: prefs)
     let detector = AnomalyDetector(dataStore: monitor.dataStore, prefs: prefs)
     let swapMonitor = SwapMonitor()
-    return StatusMenuView(monitor: monitor, prefs: prefs, anomalyDetector: detector, swapMonitor: swapMonitor, onSettingsTap: {}, onHistoryTap: {})
+    let viewModel = ProcessListViewModel(monitor: monitor, anomalyDetector: detector, prefs: prefs)
+    return StatusMenuView(monitor: monitor, prefs: prefs, anomalyDetector: detector, swapMonitor: swapMonitor, viewModel: viewModel, onSettingsTap: {}, onHistoryTap: {})
 }
