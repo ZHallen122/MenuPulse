@@ -18,7 +18,7 @@ extension Notification.Name {
 ///   anomaly alert) → green (all clear).
 /// - Managing the settings window lifecycle (single-instance, re-use on re-open).
 /// - Applying and observing the launch-at-login preference via `SMAppService`.
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
     private var hudWindow: HUDWindow?
@@ -219,7 +219,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         pop.contentViewController = vc
         pop.contentSize = NSSize(width: 300, height: 400)
         pop.behavior = .transient
+        pop.delegate = self
         self.popover = pop
+    }
+
+    // MARK: - NSPopoverDelegate
+    
+    func popoverWillShow(_ notification: Notification) {
+        processListViewModel.isPopoverVisible = true
+    }
+    
+    func popoverDidClose(_ notification: Notification) {
+        processListViewModel.isPopoverVisible = false
     }
 
     func openSettings() {

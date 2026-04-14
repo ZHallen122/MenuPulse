@@ -8,7 +8,14 @@ import SwiftUI
 /// array of structs rather than mutating existing objects. Views bind to the
 /// published array on `ProcessMonitor` and re-render when the reference
 /// changes.
-struct MenuBarProcess: Identifiable {
+struct MenuBarProcess: Identifiable, Equatable {
+    static func == (lhs: MenuBarProcess, rhs: MenuBarProcess) -> Bool {
+        lhs.pid == rhs.pid &&
+        lhs.memoryFootprintBytes == rhs.memoryFootprintBytes &&
+        lhs.cpuFraction == rhs.cpuFraction &&
+        lhs.cpuHistory == rhs.cpuHistory &&
+        lhs.memoryHistory == rhs.memoryHistory
+    }
 
     /// Stable identity using the UNIX process ID.
     ///

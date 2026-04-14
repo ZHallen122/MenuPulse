@@ -12,7 +12,16 @@ import Combine
 /// views avoid doing this work on every render cycle.
 final class ProcessListViewModel: ObservableObject {
     @Published var displayProcesses: [MenuBarProcess] = []
+    
+    var isPopoverVisible: Bool = false {
+        didSet {
+            if isPopoverVisible && displayProcesses != latestComputedProcesses {
+                displayProcesses = latestComputedProcesses
+            }
+        }
+    }
 
+    private var latestComputedProcesses: [MenuBarProcess] = []
     private var cancellables = Set<AnyCancellable>()
 
     init(monitor: ProcessMonitor, anomalyDetector: AnomalyDetector, prefs: PreferencesManager) {
@@ -35,7 +44,7 @@ final class ProcessListViewModel: ObservableObject {
                     .map { $0.trimmingCharacters(in: .whitespaces) }
                     .filter { !$0.isEmpty }
             )
-            return processes
+            let sorted = processes
                 .filter { process in
                     guard let bid = process.bundleIdentifier else { return true }
                     return !ignored.contains(bid)
@@ -47,9 +56,17 @@ final class ProcessListViewModel: ObservableObject {
                     if !a1 && a2 { return false }
                     return p1.memoryFootprintBytes > p2.memoryFootprintBytes
                 }
+            return Array(sorted.prefix(15))
         }
         .receive(on: DispatchQueue.main)
-        .assign(to: &$displayProcesses)
+        .sink { [weak self] newProcesses in
+            guard let self = self else { return }
+            self.latestComputedProcesses = newProcesses
+            if self.isPopoverVisible {
+                self.displayProcesses = newProcesses
+            }
+        }
+        .store(in: &cancellables)
     }
 }
 
