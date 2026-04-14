@@ -61,7 +61,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         setupNotifications()
         monitor.startMonitoring()
         swapMonitor.startMonitoring()
-        swapMonitor.topProcessProvider = { [weak self] in self?.monitor.processes ?? [] }
+        swapMonitor.topProcessProvider = { [weak self] in self?.monitor.currentProcesses ?? [] }
 
         // Update menu bar title: show RAM % when enabled, otherwise blank.
         Publishers.CombineLatest(monitor.$systemRAMUsedBytes, monitor.$systemRAMTotalBytes)
@@ -227,10 +227,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     
     func popoverWillShow(_ notification: Notification) {
         processListViewModel.isPopoverVisible = true
+        monitor.isUIVisible = true
     }
     
     func popoverDidClose(_ notification: Notification) {
         processListViewModel.isPopoverVisible = false
+        updateMonitorVisibility()
     }
 
     func openSettings() {
@@ -344,5 +346,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             hud.makeKeyAndOrderFront(nil)
             hudWindow = hud
         }
+        updateMonitorVisibility()
+    }
+
+    private func updateMonitorVisibility() {
+        let popoverVisible = popover?.isShown ?? false
+        let hudVisible = hudWindow?.isVisible ?? false
+        monitor.isUIVisible = popoverVisible || hudVisible
     }
 }

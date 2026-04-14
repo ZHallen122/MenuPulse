@@ -14,6 +14,14 @@ class ProcessMonitor: ObservableObject {
     /// alphabetically by name. Updated on the main queue after each sample tick.
     @Published var processes: [MenuBarProcess] = []
 
+    /// Raw list of processes updated every tick, regardless of UI visibility.
+    /// Used by background observers (e.g. SwapMonitor) without triggering UI renders.
+    private(set) var currentProcesses: [MenuBarProcess] = []
+
+    /// Whether the UI is currently visible (Popover or HUD is open).
+    /// Updated by AppDelegate to prevent unnecessary `@Published` state mutations.
+    var isUIVisible: Bool = false
+
     /// System-wide CPU utilisation as a fraction in `[0, 1]`, computed from
     /// `host_statistics(HOST_CPU_LOAD_INFO)` tick deltas (user + sys + nice).
     /// Returns `0` until the second sample, when a delta can be calculated.
@@ -89,9 +97,14 @@ class ProcessMonitor: ObservableObject {
         let activationPolicy: NSApplication.ActivationPolicy
     }
 
+    private enum AppStaticCacheResult {
+        case notAnApp
+        case app(AppStaticProperties)
+    }
+
     /// Per-PID cache of static NSRunningApplication properties (don't change for a given PID).
     /// Populated on first encounter; pruned when the PID disappears from livePIDs.
-    private var appStaticCache: [pid_t: AppStaticProperties] = [:]
+    private var appStaticCache: [pid_t: AppStaticCacheResult] = [:]
 
     // MARK: - Per-app lifecycle cache (accessed only on sampleQueue)
 
@@ -172,10 +185,16 @@ class ProcessMonitor: ObservableObject {
             guard pid > 0 else { continue }
 
             let staticProps: AppStaticProperties
-            if let cached = appStaticCache[pid] {
-                staticProps = cached
+            if let result = appStaticCache[pid] {
+                switch result {
+                case .notAnApp: continue
+                case .app(let props): staticProps = props
+                }
             } else {
-                guard let app = NSRunningApplication(processIdentifier: pid) else { continue }
+                guard let app = NSRunningApplication(processIdentifier: pid) else {
+                    appStaticCache[pid] = .notAnApp
+                    continue
+                }
                 let props = AppStaticProperties(
                     name: app.localizedName ?? "Unknown",
                     bundleIdentifier: app.bundleIdentifier,
@@ -184,7 +203,7 @@ class ProcessMonitor: ObservableObject {
                     launchDate: app.launchDate,
                     activationPolicy: app.activationPolicy
                 )
-                appStaticCache[pid] = props
+                appStaticCache[pid] = .app(props)
                 staticProps = props
             }
 
@@ -282,7 +301,8 @@ class ProcessMonitor: ObservableObject {
             appStaticCache.removeValue(forKey: deadPid)
         }
 
-        let sorted = newProcesses.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        // No need to sort here, ProcessListViewModel sorts it later.
+        let sorted = newProcesses
 
         // Persist every 5 s in testing mode (vs 30 s normally) so there are enough
         // data points in the 2-minute trending window used by AnomalyDetector.
@@ -442,7 +462,10 @@ class ProcessMonitor: ObservableObject {
 
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            self.processes = sorted
+            self.currentProcesses = sorted
+            if self.isUIVisible {
+                self.processes = sorted
+            }
             self.systemCPUFraction = cpuFrac
             self.systemRAMUsedBytes = ramUsed
             self.systemRAMTotalBytes = ramTotal
