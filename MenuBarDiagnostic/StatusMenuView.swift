@@ -94,6 +94,7 @@ struct StatusMenuView: View {
             footerBar
         }
         .frame(width: 300)
+        .preferredColorScheme(.dark)
         .onDisappear { hoveredFooterButton = nil }
     }
 
