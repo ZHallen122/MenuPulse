@@ -328,7 +328,7 @@ final class DataStore {
         let appLifecycle = """
             CREATE TABLE IF NOT EXISTS app_lifecycle (
                 bundle_id TEXT PRIMARY KEY,
-                state TEXT NOT NULL DEFAULT 'learning',
+                state TEXT NOT NULL DEFAULT 'learning_phase_1',
                 version TEXT,
                 learning_started_at INTEGER,
                 last_seen_at INTEGER
@@ -440,6 +440,16 @@ final class DataStore {
                 NSLog("DataStore: failed to add 'sample_count' column to app_lifecycle: %@",
                       String(cString: sqlite3_errmsg(db)))
             }
+        }
+
+        // Migrate legacy 'learning' default state to the current 'learning_phase_1'.
+        // Rows inserted before the numbered-phase system was introduced carry the old
+        // default. Treat them identically to phase_1 so they flow through the normal
+        // phase advancement logic rather than hitting the stale/legacy branch.
+        let migrateLearning = "UPDATE app_lifecycle SET state = 'learning_phase_1' WHERE state = 'learning';"
+        if sqlite3_exec(db, migrateLearning, nil, nil, nil) != SQLITE_OK {
+            NSLog("DataStore: failed to migrate legacy 'learning' state: %@",
+                  String(String(cString: sqlite3_errmsg(db))))
         }
     }
 
@@ -591,7 +601,10 @@ final class DataStore {
         }
         defer { sqlite3_finalize(uStmt) }
 
-        sqlite3_exec(db, "BEGIN;", nil, nil, nil)
+        if sqlite3_exec(db, "BEGIN IMMEDIATE;", nil, nil, nil) != SQLITE_OK {
+            NSLog("DataStore: BEGIN IMMEDIATE failed in rebuildBaselines: %@", String(cString: sqlite3_errmsg(db)))
+            return
+        }
         for group in groups {
             let sorted = group.values.sorted()
             let avg = sorted.reduce(0, +) / Double(sorted.count)
@@ -616,7 +629,10 @@ final class DataStore {
             }
             sqlite3_reset(uStmt)
         }
-        sqlite3_exec(db, "COMMIT;", nil, nil, nil)
+        if sqlite3_exec(db, "COMMIT;", nil, nil, nil) != SQLITE_OK {
+            NSLog("DataStore: COMMIT failed in rebuildBaselines: %@", String(cString: sqlite3_errmsg(db)))
+            sqlite3_exec(db, "ROLLBACK;", nil, nil, nil)
+        }
     }
 
     private func getRecentSamplesStmt() -> OpaquePointer? {
@@ -737,12 +753,12 @@ final class DataStore {
 
     /// Upserts last_seen_at and state. Does NOT touch learning_started_at on updates
     /// (preserving whatever the existing row has). For new row inserts, sets
-    /// learning_started_at to now when state == "learning".
+    /// learning_started_at to now when state has the "learning_" prefix.
     private func doUpdateAppLifecycle(bundleID: String, state: String, version: String?, lastSeen: Date) {
         guard let db = db else { return }
         let lastSeenTS = Int64(lastSeen.timeIntervalSince1970)
         let nowTS = Int64(Date().timeIntervalSince1970)
-        // For fresh INSERT: supply learning_started_at=now when state=='learning'.
+        // For fresh INSERT: supply learning_started_at=now when state has the "learning_" prefix.
         // ON CONFLICT UPDATE: skip learning_started_at so the existing value is preserved.
         let sql = """
             INSERT INTO app_lifecycle (bundle_id, state, version, learning_started_at, last_seen_at)

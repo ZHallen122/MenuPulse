@@ -421,9 +421,8 @@ class ProcessMonitor: ObservableObject {
                                                                    version: entry.version,
                                                                    learningStartedAt: nil,
                                                                    lastSeen: now)
-                    } else if entry.state == "stale" || entry.state == "learning" {
-                        // Known but dormant, or stub row from insertSamples with the legacy
-                        // default 'learning' state: restart learning clock.
+                    } else if entry.state == "stale" {
+                        // Known but dormant: restart learning clock.
                         dataStore.resetToLearning(bundleID: bundleID, version: version)
                         lifecycleCache[bundleID] = LifecycleEntry(state: "learning_phase_1",
                                                                    version: version ?? entry.version,
