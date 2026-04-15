@@ -186,12 +186,20 @@ class ProcessMonitor: ObservableObject {
         let currentPIDs = getActivePIDsFast()
         let activePIDsSet = Set(currentPIDs)
         var bundleURLMap: [String: URL] = [:]
-        var newProcesses: [MenuBarProcess] = []
+
+        // Keyed by PID for O(1) parent lookup during the grouping pass below.
+        // Pre-sized to the current PID count to avoid incremental reallocations.
+        var processDict: [pid_t: MenuBarProcess] = [:]
+        processDict.reserveCapacity(currentPIDs.count)
 
         for pid in currentPIDs {
             guard pid > 0 else { continue }
             guard pid != ProcessInfo.processInfo.processIdentifier else { continue }
 
+            // --- Strict IPC Guard ---
+            // NSRunningApplication(processIdentifier:) crosses an XPC boundary and is
+            // expensive. Only call it when the PID is NOT already in the static-info
+            // cache; every subsequent tick reads directly from the dictionary.
             let staticProps: AppStaticProperties
             if let result = appStaticCache[pid] {
                 switch result {
@@ -284,7 +292,7 @@ class ProcessMonitor: ObservableObject {
             if memHistory.count > 20 { memHistory.removeFirst(memHistory.count - 20) }
             memoryHistories[pid] = memHistory
 
-            newProcesses.append(MenuBarProcess(
+            processDict[pid] = MenuBarProcess(
                 pid: pid,
                 name: staticProps.name,
                 bundleIdentifier: staticProps.bundleIdentifier,
@@ -295,15 +303,60 @@ class ProcessMonitor: ObservableObject {
                 memoryFootprintBytes: memFootprint,
                 thermalState: thermalState,
                 launchDate: staticProps.launchDate
-            ))
+            )
+        }
+
+        // --- Process Grouping (Folding Helpers) ---
+        // For each tracked PID, ask the kernel for its PPID. If the parent is also
+        // a tracked main app (e.g. Chrome and its renderer helpers both appear in
+        // processDict), roll the child's physical footprint into the parent's total
+        // and omit the child from the final list. This avoids double-counting the
+        // same app's footprint across multiple helper processes.
+        var parentMemBonus: [pid_t: UInt64] = [:]
+        var childPIDs: Set<pid_t> = []
+
+        for pid in processDict.keys {
+            if let ppid = ProcessSyscall.getParentPID(of: pid),
+               processDict[ppid] != nil {
+                parentMemBonus[ppid, default: 0] += processDict[pid]!.memoryFootprintBytes
+                childPIDs.insert(pid)
+            }
+        }
+
+        // Build the final result array, excluding folded children.
+        // Pre-size to avoid incremental buffer copies.
+        var newProcesses: [MenuBarProcess] = []
+        newProcesses.reserveCapacity(processDict.count - childPIDs.count)
+
+        for (pid, proc) in processDict where !childPIDs.contains(pid) {
+            if let bonus = parentMemBonus[pid] {
+                // Recreate the snapshot with the adjusted total memory so that the
+                // UI shows the true combined footprint of the app + its helpers.
+                newProcesses.append(MenuBarProcess(
+                    pid: proc.pid,
+                    name: proc.name,
+                    bundleIdentifier: proc.bundleIdentifier,
+                    icon: proc.icon,
+                    cpuFraction: proc.cpuFraction,
+                    cpuHistory: proc.cpuHistory,
+                    memoryHistory: proc.memoryHistory,
+                    memoryFootprintBytes: proc.memoryFootprintBytes + bonus,
+                    thermalState: proc.thermalState,
+                    launchDate: proc.launchDate
+                ))
+            } else {
+                newProcesses.append(proc)
+            }
         }
 
         // Prune stale state for PIDs that are no longer running.
-        let livePIDs = Set(newProcesses.map { $0.pid })
+        // Use the full processDict keyset (includes folded children) so that
+        // CPU-delta state is preserved for helper processes between ticks.
+        let livePIDs = Set(processDict.keys)
         previousSamples = previousSamples.filter { livePIDs.contains($0.key) }
         cpuHistories = cpuHistories.filter { livePIDs.contains($0.key) }
         memoryHistories = memoryHistories.filter { livePIDs.contains($0.key) }
-        
+
         let deadPIDs = Set(appStaticCache.keys).subtracting(activePIDsSet)
         for deadPid in deadPIDs {
             appStaticCache.removeValue(forKey: deadPid)
