@@ -49,36 +49,36 @@
 
 /* Begin PBXFileReference section */
 		AA000000000000000000000C /* Menu Bar Diagnostic.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Menu Bar Diagnostic.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		AA000000000000000000000D /* MenuBarDiagnosticApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarDiagnosticApp.swift; sourceTree = "<group>"; };
-		AA000000000000000000000E /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		AA000000000000000000000F /* StatusMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenuView.swift; sourceTree = "<group>"; };
+		AA000000000000000000000D /* MenuBarDiagnosticApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/MenuBarDiagnosticApp.swift"; sourceTree = "<group>"; };
+		AA000000000000000000000E /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/AppDelegate.swift"; sourceTree = "<group>"; };
+		AA000000000000000000000F /* StatusMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Popover/StatusMenuView.swift"; sourceTree = "<group>"; };
 		AA0000000000000000000010 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		AA0000000000000000000020 /* MenuBarProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarProcess.swift; sourceTree = "<group>"; };
-		AA0000000000000000000021 /* ProcessMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessMonitor.swift; sourceTree = "<group>"; };
-		AA0000000000000000000030 /* HUDWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDWindow.swift; sourceTree = "<group>"; };
-		AA0000000000000000000032 /* HUDView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDView.swift; sourceTree = "<group>"; };
-		AA0000000000000000000040 /* PreferencesManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesManager.swift; sourceTree = "<group>"; };
-		AA0000000000000000000042 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		AA0000000000000000000051 /* SparklineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SparklineView.swift; sourceTree = "<group>"; };
-		AA0000000000000000000053 /* RAMBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RAMBarView.swift; sourceTree = "<group>"; };
-		AA0000000000000000000055 /* ThermalHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThermalHeaderView.swift; sourceTree = "<group>"; };
-		AA0000000000000000000057 /* ProcessDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessDetailSheet.swift; sourceTree = "<group>"; };
-		AA0000000000000000000059 /* HUDProcessRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDProcessRow.swift; sourceTree = "<group>"; };
-		AA000000000000000000005B /* ThermalState+Display.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ThermalState+Display.swift"; sourceTree = "<group>"; };
-		AA000000000000000000005D /* DataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataStore.swift; sourceTree = "<group>"; };
-		AA000000000000000000005F /* MemoryPressure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryPressure.swift; sourceTree = "<group>"; };
-		AA0000000000000000000061 /* AnomalyDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnomalyDetector.swift; sourceTree = "<group>"; };
-		AA0000000000000000000063 /* SwapMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwapMonitor.swift; sourceTree = "<group>"; };
+		AA0000000000000000000020 /* MenuBarProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sampling/MenuBarProcess.swift"; sourceTree = "<group>"; };
+		AA0000000000000000000021 /* ProcessMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sampling/ProcessMonitor.swift"; sourceTree = "<group>"; };
+		AA0000000000000000000030 /* HUDWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/HUD/HUDWindow.swift"; sourceTree = "<group>"; };
+		AA0000000000000000000032 /* HUDView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/HUD/HUDView.swift"; sourceTree = "<group>"; };
+		AA0000000000000000000040 /* PreferencesManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Settings/PreferencesManager.swift"; sourceTree = "<group>"; };
+		AA0000000000000000000042 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Settings/SettingsView.swift"; sourceTree = "<group>"; };
+		AA0000000000000000000051 /* SparklineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Popover/SparklineView.swift"; sourceTree = "<group>"; };
+		AA0000000000000000000053 /* RAMBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/HUD/RAMBarView.swift"; sourceTree = "<group>"; };
+		AA0000000000000000000055 /* ThermalHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/HUD/ThermalHeaderView.swift"; sourceTree = "<group>"; };
+		AA0000000000000000000057 /* ProcessDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/HUD/ProcessDetailSheet.swift"; sourceTree = "<group>"; };
+		AA0000000000000000000059 /* HUDProcessRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/HUD/HUDProcessRow.swift"; sourceTree = "<group>"; };
+		AA000000000000000000005B /* ThermalState+Display.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/HUD/ThermalState+Display.swift"; sourceTree = "<group>"; };
+		AA000000000000000000005D /* DataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Storage/DataStore.swift"; sourceTree = "<group>"; };
+		AA000000000000000000005F /* MemoryPressure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sampling/MemoryPressure.swift"; sourceTree = "<group>"; };
+		AA0000000000000000000061 /* AnomalyDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Detection/AnomalyDetector.swift"; sourceTree = "<group>"; };
+		AA0000000000000000000063 /* SwapMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sampling/SwapMonitor.swift"; sourceTree = "<group>"; };
 		BB0000000000000000000001 /* MenuBarDiagnosticTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MenuBarDiagnosticTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB0000000000000000000009 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
 		BB000000000000000000000B /* MenuBarDiagnosticTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarDiagnosticTests.swift; sourceTree = "<group>"; };
-		DD0000000000000000000002 /* IconColorLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconColorLogic.swift; sourceTree = "<group>"; };
+		DD0000000000000000000002 /* IconColorLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/IconColorLogic.swift"; sourceTree = "<group>"; };
 		EE000000000000000000001B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		EE000000000000000000003B /* SparkleUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SparkleUpdater.swift; sourceTree = "<group>"; };
-		EE000000000000000000004B /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
-		FF000000000000000000001A /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
-		FF000000000000000000001C /* HistoryWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryWindow.swift; sourceTree = "<group>"; };
-		AA0000000000000000000065 /* ProcessSyscall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessSyscall.swift; sourceTree = "<group>"; };
+		EE000000000000000000003B /* SparkleUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Updates/SparkleUpdater.swift"; sourceTree = "<group>"; };
+		EE000000000000000000004B /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Onboarding/OnboardingView.swift"; sourceTree = "<group>"; };
+		FF000000000000000000001A /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/History/HistoryView.swift"; sourceTree = "<group>"; };
+		FF000000000000000000001C /* HistoryWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/History/HistoryWindow.swift"; sourceTree = "<group>"; };
+		AA0000000000000000000065 /* ProcessSyscall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sampling/ProcessSyscall.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
