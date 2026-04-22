@@ -42,7 +42,7 @@ All tests must pass before submitting a PR.
 - **No forced unwraps** without an inline comment explaining why the value is guaranteed non-nil.
 - **Runtime errors**: use `NSLog` (not `print`) for errors that operators or crash reports need to surface.
 - **No silent failures**: every `sqlite3_prepare_v2`, bind, or step call that can fail must log on failure before returning.
-- Follow the existing file structure. See [README.md](README.md#key-files) for the layer overview.
+- Follow the existing file structure. See [README.md](README.md#key-files) for the layer overview and [ARCHITECTURE.md](ARCHITECTURE.md) for layer boundaries and where to place new files.
 
 ## Submitting a PR
 
