@@ -28,7 +28,19 @@
 		AA0000000000000000000064 /* SwapMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000063 /* SwapMonitor.swift */; };
 		AD826C032F8D763E003D3821 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = AD826C022F8D763E003D3821 /* Sparkle */; };
 		BB000000000000000000000A /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000009 /* XCTest.framework */; };
-		BB000000000000000000000C /* MenuBarDiagnosticTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000000B /* MenuBarDiagnosticTests.swift */; };
+		BB0000000000000000000111 /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000101 /* TestSupport.swift */; };
+		BB0000000000000000000112 /* AnomalyDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000102 /* AnomalyDetectorTests.swift */; };
+		BB0000000000000000000113 /* DataStoreSchemaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000103 /* DataStoreSchemaTests.swift */; };
+		BB0000000000000000000114 /* DataStoreSamplesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000104 /* DataStoreSamplesTests.swift */; };
+		BB0000000000000000000115 /* DataStoreBaselineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000105 /* DataStoreBaselineTests.swift */; };
+		BB0000000000000000000116 /* DataStoreAlertEventsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000106 /* DataStoreAlertEventsTests.swift */; };
+		BB0000000000000000000117 /* ProcessMonitorEnumerationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000107 /* ProcessMonitorEnumerationTests.swift */; };
+		BB0000000000000000000118 /* ProcessMonitorHelperFoldingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000108 /* ProcessMonitorHelperFoldingTests.swift */; };
+		BB0000000000000000000119 /* SwapMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000109 /* SwapMonitorTests.swift */; };
+		BB000000000000000000011A /* IconColorLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000010A /* IconColorLogicTests.swift */; };
+		BB000000000000000000011B /* PreferencesManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000010B /* PreferencesManagerTests.swift */; };
+		BB000000000000000000011C /* MemoryPressureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000010C /* MemoryPressureTests.swift */; };
+		BB000000000000000000011D /* MiscTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000010D /* MiscTests.swift */; };
 		CC0000000000000000000001 /* AnomalyDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000061 /* AnomalyDetector.swift */; };
 		CC0000000000000000000002 /* DataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000005D /* DataStore.swift */; };
 		CC0000000000000000000003 /* MenuBarProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000020 /* MenuBarProcess.swift */; };
@@ -85,7 +97,19 @@
 		AA0000000000000000000063 /* SwapMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sampling/SwapMonitor.swift"; sourceTree = "<group>"; };
 		BB0000000000000000000001 /* MenuBarDiagnosticTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MenuBarDiagnosticTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB0000000000000000000009 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
-		BB000000000000000000000B /* MenuBarDiagnosticTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarDiagnosticTests.swift; sourceTree = "<group>"; };
+		BB0000000000000000000101 /* TestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
+		BB0000000000000000000102 /* AnomalyDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnomalyDetectorTests.swift; sourceTree = "<group>"; };
+		BB0000000000000000000103 /* DataStoreSchemaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataStoreSchemaTests.swift; sourceTree = "<group>"; };
+		BB0000000000000000000104 /* DataStoreSamplesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataStoreSamplesTests.swift; sourceTree = "<group>"; };
+		BB0000000000000000000105 /* DataStoreBaselineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataStoreBaselineTests.swift; sourceTree = "<group>"; };
+		BB0000000000000000000106 /* DataStoreAlertEventsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataStoreAlertEventsTests.swift; sourceTree = "<group>"; };
+		BB0000000000000000000107 /* ProcessMonitorEnumerationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessMonitorEnumerationTests.swift; sourceTree = "<group>"; };
+		BB0000000000000000000108 /* ProcessMonitorHelperFoldingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessMonitorHelperFoldingTests.swift; sourceTree = "<group>"; };
+		BB0000000000000000000109 /* SwapMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwapMonitorTests.swift; sourceTree = "<group>"; };
+		BB000000000000000000010A /* IconColorLogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconColorLogicTests.swift; sourceTree = "<group>"; };
+		BB000000000000000000010B /* PreferencesManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesManagerTests.swift; sourceTree = "<group>"; };
+		BB000000000000000000010C /* MemoryPressureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryPressureTests.swift; sourceTree = "<group>"; };
+		BB000000000000000000010D /* MiscTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiscTests.swift; sourceTree = "<group>"; };
 		DD0000000000000000000002 /* IconColorLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/IconColorLogic.swift"; sourceTree = "<group>"; };
 		EE000000000000000000001B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		EE000000000000000000003B /* SparkleUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Updates/SparkleUpdater.swift"; sourceTree = "<group>"; };
@@ -201,7 +225,19 @@
 		BB000000000000000000000D /* MenuBarDiagnosticTests */ = {
 			isa = PBXGroup;
 			children = (
-				BB000000000000000000000B /* MenuBarDiagnosticTests.swift */,
+				BB0000000000000000000101 /* TestSupport.swift */,
+				BB0000000000000000000102 /* AnomalyDetectorTests.swift */,
+				BB0000000000000000000103 /* DataStoreSchemaTests.swift */,
+				BB0000000000000000000104 /* DataStoreSamplesTests.swift */,
+				BB0000000000000000000105 /* DataStoreBaselineTests.swift */,
+				BB0000000000000000000106 /* DataStoreAlertEventsTests.swift */,
+				BB0000000000000000000107 /* ProcessMonitorEnumerationTests.swift */,
+				BB0000000000000000000108 /* ProcessMonitorHelperFoldingTests.swift */,
+				BB0000000000000000000109 /* SwapMonitorTests.swift */,
+				BB000000000000000000010A /* IconColorLogicTests.swift */,
+				BB000000000000000000010B /* PreferencesManagerTests.swift */,
+				BB000000000000000000010C /* MemoryPressureTests.swift */,
+				BB000000000000000000010D /* MiscTests.swift */,
 			);
 			path = MenuBarDiagnosticTests;
 			sourceTree = "<group>";
@@ -348,7 +384,19 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				BB000000000000000000000C /* MenuBarDiagnosticTests.swift in Sources */,
+				BB0000000000000000000111 /* TestSupport.swift in Sources */,
+				BB0000000000000000000112 /* AnomalyDetectorTests.swift in Sources */,
+				BB0000000000000000000113 /* DataStoreSchemaTests.swift in Sources */,
+				BB0000000000000000000114 /* DataStoreSamplesTests.swift in Sources */,
+				BB0000000000000000000115 /* DataStoreBaselineTests.swift in Sources */,
+				BB0000000000000000000116 /* DataStoreAlertEventsTests.swift in Sources */,
+				BB0000000000000000000117 /* ProcessMonitorEnumerationTests.swift in Sources */,
+				BB0000000000000000000118 /* ProcessMonitorHelperFoldingTests.swift in Sources */,
+				BB0000000000000000000119 /* SwapMonitorTests.swift in Sources */,
+				BB000000000000000000011A /* IconColorLogicTests.swift in Sources */,
+				BB000000000000000000011B /* PreferencesManagerTests.swift in Sources */,
+				BB000000000000000000011C /* MemoryPressureTests.swift in Sources */,
+				BB000000000000000000011D /* MiscTests.swift in Sources */,
 				CC0000000000000000000001 /* AnomalyDetector.swift in Sources */,
 				CC0000000000000000000002 /* DataStore.swift in Sources */,
 				CC0000000000000000000003 /* MenuBarProcess.swift in Sources */,
