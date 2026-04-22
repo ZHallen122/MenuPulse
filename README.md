@@ -74,30 +74,38 @@ ProcessMonitor  ──samples every 2s──►  AnomalyDetector
 
 | File | Role |
 |---|---|
-| `MenuBarDiagnosticApp.swift` | SwiftUI `@main` entry point; wires `AppDelegate` via `@NSApplicationDelegateAdaptor` |
-| `AppDelegate.swift` | Owns `NSStatusItem`, `NSPopover`, notification handling |
-| `ProcessMonitor.swift` | Sampling engine; publishes `[MenuBarProcess]` and system memory pressure |
-| `AnomalyDetector.swift` | Three-condition evaluator; posts notifications; owns anomaly timers and cooldowns |
-| `DataStore.swift` | SQLite wrapper; stores per-app samples, computes p90 baseline |
-| `MenuBarProcess.swift` | Immutable value-type snapshot of a single process |
-| `StatusMenuView.swift` | SwiftUI popover root; shows process list with sparklines and anomaly highlights |
-| `HUDView.swift` | Main popover HUD listing all monitored processes |
-| `HUDWindow.swift` | `NSWindow` subclass that hosts the HUD |
-| `HUDProcessRow.swift` | Single process row with alert-threshold highlighting |
-| `ThermalHeaderView.swift` | Header showing system thermal/memory pressure state |
-| `RAMBarView.swift` | Visual RAM usage bar component |
-| `MemoryPressure.swift` | System memory pressure reading utilities |
-| `ProcessDetailSheet.swift` | Expanded detail sheet for a single process |
-| `ThermalState+Display.swift` | Extension adding display strings to `ProcessInfo.ThermalState` |
-| `IconColorLogic.swift` | Pure `iconColor()` function; maps `SwapState` + `pendingAnomalyAlert` → `NSColor` for the status bar icon |
-| `SwapMonitor.swift` | `ObservableObject` that polls `vm.swapusage` every 30 s; publishes swap stats and `SwapState`; posts swap-active notification |
-| `SparklineView.swift` | `Canvas`-based rolling memory sparkline |
-| `HistoryView.swift` | History window SwiftUI view; top-offenders leaderboard and per-app memory timeline |
-| `HistoryWindow.swift` | `NSWindow` subclass that hosts the history view |
-| `PreferencesManager.swift` | `ObservableObject` wrapping `@AppStorage` user preferences |
-| `SettingsView.swift` | SwiftUI settings UI (sensitivity, launch at login, Block List tab for ignored bundle IDs) |
-| `OnboardingView.swift` | First-launch onboarding sheet; requests notification permission; gated by `hasShownOnboarding` UserDefaults key |
-| `SparkleUpdater.swift` | Sparkle 2.9.1 wrapper; drives automatic and manual update checks |
+| `App/MenuBarDiagnosticApp.swift` | SwiftUI `@main` entry point; wires `AppDelegate` via `@NSApplicationDelegateAdaptor` |
+| `App/AppDelegate.swift` | Owns `NSStatusItem`, `NSPopover`, notification handling |
+| `App/IconColorLogic.swift` | Pure `iconColor()` function; maps `SwapState` + `pendingAnomalyAlert` → `NSColor` for the status bar icon |
+| `Sampling/ProcessMonitor.swift` | Sampling engine; publishes `[MenuBarProcess]` and system memory pressure |
+| `Sampling/ProcessMonitor+Enumeration.swift` | Process enumeration helpers (listing accessory-policy apps from the running workspace) |
+| `Sampling/ProcessMonitor+HelperFolding.swift` | Folds child/helper processes into their parent menu-bar app for aggregate memory accounting |
+| `Sampling/ProcessMonitor+XPCCache.swift` | Caches XPC service bundle lookups so repeated sampling doesn't hit the filesystem |
+| `Sampling/MemoryPressure.swift` | System memory pressure reading utilities |
+| `Sampling/SwapMonitor.swift` | `ObservableObject` that polls `vm.swapusage` every 30 s; publishes swap stats and `SwapState`; posts swap-active notification |
+| `Sampling/MenuBarProcess.swift` | Immutable value-type snapshot of a single process |
+| `Sampling/ProcessSyscall.swift` | Thin wrapper around `proc_pidinfo` and related syscalls used by the sampler |
+| `Detection/AnomalyDetector.swift` | Three-condition evaluator; posts notifications; owns anomaly timers and cooldowns |
+| `Storage/DataStore.swift` | SQLite wrapper; stores per-app samples, computes p90 baseline |
+| `Storage/DataStore+Schema.swift` | Schema creation and migration for the `samples` and `alert_events` tables |
+| `Storage/DataStore+Samples.swift` | Insert, query, and pruning of per-app memory samples |
+| `Storage/DataStore+Baseline.swift` | p90 baseline computation per bundle ID over the rolling sample window |
+| `Storage/DataStore+AlertEvents.swift` | Recording and retrieval of alert events for the History window |
+| `UI/Popover/StatusMenuView.swift` | SwiftUI popover root; shows process list with sparklines and anomaly highlights |
+| `UI/Popover/SparklineView.swift` | `Canvas`-based rolling memory sparkline |
+| `UI/HUD/HUDView.swift` | Main popover HUD listing all monitored processes |
+| `UI/HUD/HUDWindow.swift` | `NSWindow` subclass that hosts the HUD |
+| `UI/HUD/HUDProcessRow.swift` | Single process row with alert-threshold highlighting |
+| `UI/HUD/ThermalHeaderView.swift` | Header showing system thermal/memory pressure state |
+| `UI/HUD/RAMBarView.swift` | Visual RAM usage bar component |
+| `UI/HUD/ProcessDetailSheet.swift` | Expanded detail sheet for a single process |
+| `UI/HUD/ThermalState+Display.swift` | Extension adding display strings to `ProcessInfo.ThermalState` |
+| `UI/History/HistoryView.swift` | History window SwiftUI view; top-offenders leaderboard and per-app memory timeline |
+| `UI/History/HistoryWindow.swift` | `NSWindow` subclass that hosts the history view |
+| `UI/Settings/PreferencesManager.swift` | `ObservableObject` wrapping `@AppStorage` user preferences |
+| `UI/Settings/SettingsView.swift` | SwiftUI settings UI (sensitivity, launch at login, Block List tab for ignored bundle IDs) |
+| `UI/Onboarding/OnboardingView.swift` | First-launch onboarding sheet; requests notification permission; gated by `hasShownOnboarding` UserDefaults key |
+| `Updates/SparkleUpdater.swift` | Sparkle 2.9.1 wrapper; drives automatic and manual update checks |
 
 ---
 
