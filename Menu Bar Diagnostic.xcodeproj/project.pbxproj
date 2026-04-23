@@ -7,25 +7,33 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AA0000000000000000000011 /* MenuBarDiagnosticApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000000D /* MenuBarDiagnosticApp.swift */; };
-		AA0000000000000000000012 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000000E /* AppDelegate.swift */; };
-		AA0000000000000000000013 /* StatusMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000000F /* StatusMenuView.swift */; };
-		AA0000000000000000000022 /* MenuBarProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000020 /* MenuBarProcess.swift */; };
-		AA0000000000000000000023 /* ProcessMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000021 /* ProcessMonitor.swift */; };
-		AA0000000000000000000031 /* HUDWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000030 /* HUDWindow.swift */; };
-		AA0000000000000000000033 /* HUDView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000032 /* HUDView.swift */; };
-		AA0000000000000000000041 /* PreferencesManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000040 /* PreferencesManager.swift */; };
-		AA0000000000000000000043 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000042 /* SettingsView.swift */; };
-		AA0000000000000000000052 /* SparklineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000051 /* SparklineView.swift */; };
-		AA0000000000000000000054 /* RAMBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000053 /* RAMBarView.swift */; };
-		AA0000000000000000000056 /* ThermalHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000055 /* ThermalHeaderView.swift */; };
-		AA0000000000000000000058 /* ProcessDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000057 /* ProcessDetailSheet.swift */; };
-		AA000000000000000000005A /* HUDProcessRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000059 /* HUDProcessRow.swift */; };
-		AA000000000000000000005C /* ThermalState+Display.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000005B /* ThermalState+Display.swift */; };
-		AA000000000000000000005E /* DataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000005D /* DataStore.swift */; };
-		AA0000000000000000000060 /* MemoryPressure.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000005F /* MemoryPressure.swift */; };
-		AA0000000000000000000062 /* AnomalyDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000061 /* AnomalyDetector.swift */; };
-		AA0000000000000000000064 /* SwapMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000063 /* SwapMonitor.swift */; };
+		AA0000000000000000000011 /* App/MenuBarDiagnosticApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000000D /* App/MenuBarDiagnosticApp.swift */; };
+		AA0000000000000000000012 /* App/AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000000E /* App/AppDelegate.swift */; };
+		AA0000000000000000000013 /* UI/Popover/StatusMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000000F /* UI/Popover/StatusMenuView.swift */; };
+		AA0000000000000000000022 /* Sampling/MenuBarProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000020 /* Sampling/MenuBarProcess.swift */; };
+		AA0000000000000000000023 /* Sampling/ProcessMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000021 /* Sampling/ProcessMonitor.swift */; };
+		AA0000000000000000000031 /* UI/HUD/HUDWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000030 /* UI/HUD/HUDWindow.swift */; };
+		AA0000000000000000000033 /* UI/HUD/HUDView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000032 /* UI/HUD/HUDView.swift */; };
+		AA0000000000000000000041 /* UI/Settings/PreferencesManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000040 /* UI/Settings/PreferencesManager.swift */; };
+		AA0000000000000000000043 /* UI/Settings/SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000042 /* UI/Settings/SettingsView.swift */; };
+		AA0000000000000000000052 /* UI/Popover/SparklineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000051 /* UI/Popover/SparklineView.swift */; };
+		AA0000000000000000000054 /* UI/HUD/RAMBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000053 /* UI/HUD/RAMBarView.swift */; };
+		AA0000000000000000000056 /* UI/HUD/ThermalHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000055 /* UI/HUD/ThermalHeaderView.swift */; };
+		AA0000000000000000000058 /* UI/HUD/ProcessDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000057 /* UI/HUD/ProcessDetailSheet.swift */; };
+		AA000000000000000000005A /* UI/HUD/HUDProcessRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000059 /* UI/HUD/HUDProcessRow.swift */; };
+		AA000000000000000000005C /* UI/HUD/ThermalState+Display.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000005B /* UI/HUD/ThermalState+Display.swift */; };
+		AA000000000000000000005E /* Storage/DataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000005D /* Storage/DataStore.swift */; };
+		AA0000000000000000000060 /* Sampling/MemoryPressure.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000005F /* Sampling/MemoryPressure.swift */; };
+		AA0000000000000000000062 /* Detection/AnomalyDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000061 /* Detection/AnomalyDetector.swift */; };
+		AA0000000000000000000064 /* Sampling/SwapMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000063 /* Sampling/SwapMonitor.swift */; };
+		AA0000000000000000000066 /* Sampling/ProcessSyscall.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000065 /* Sampling/ProcessSyscall.swift */; };
+		AA0000000000000000000101 /* Storage/DataStore+Schema.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000100 /* Storage/DataStore+Schema.swift */; };
+		AA0000000000000000000103 /* Storage/DataStore+Samples.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000102 /* Storage/DataStore+Samples.swift */; };
+		AA0000000000000000000105 /* Storage/DataStore+Baseline.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000104 /* Storage/DataStore+Baseline.swift */; };
+		AA0000000000000000000107 /* Storage/DataStore+AlertEvents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000106 /* Storage/DataStore+AlertEvents.swift */; };
+		AA0000000000000000000109 /* Sampling/ProcessMonitor+Enumeration.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000108 /* Sampling/ProcessMonitor+Enumeration.swift */; };
+		AA000000000000000000010B /* Sampling/ProcessMonitor+HelperFolding.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000010A /* Sampling/ProcessMonitor+HelperFolding.swift */; };
+		AA000000000000000000010D /* Sampling/ProcessMonitor+XPCCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000010C /* Sampling/ProcessMonitor+XPCCache.swift */; };
 		AD826C032F8D763E003D3821 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = AD826C022F8D763E003D3821 /* Sparkle */; };
 		BB000000000000000000000A /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000009 /* XCTest.framework */; };
 		BB0000000000000000000111 /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000101 /* TestSupport.swift */; };
@@ -41,60 +49,60 @@
 		BB000000000000000000011B /* PreferencesManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000010B /* PreferencesManagerTests.swift */; };
 		BB000000000000000000011C /* MemoryPressureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000010C /* MemoryPressureTests.swift */; };
 		BB000000000000000000011D /* MiscTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000010D /* MiscTests.swift */; };
-		CC0000000000000000000001 /* AnomalyDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000061 /* AnomalyDetector.swift */; };
-		CC0000000000000000000002 /* DataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000005D /* DataStore.swift */; };
-		CC0000000000000000000003 /* MenuBarProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000020 /* MenuBarProcess.swift */; };
-		CC0000000000000000000004 /* MemoryPressure.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000005F /* MemoryPressure.swift */; };
-		CC0000000000000000000005 /* PreferencesManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000040 /* PreferencesManager.swift */; };
-		CC0000000000000000000006 /* SwapMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000063 /* SwapMonitor.swift */; };
-		CC0000000000000000000007 /* ProcessMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000021 /* ProcessMonitor.swift */; };
-		DD0000000000000000000001 /* IconColorLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0000000000000000000002 /* IconColorLogic.swift */; };
-		DD0000000000000000000003 /* IconColorLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0000000000000000000002 /* IconColorLogic.swift */; };
+		CC0000000000000000000001 /* Detection/AnomalyDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000061 /* Detection/AnomalyDetector.swift */; };
+		CC0000000000000000000002 /* Storage/DataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000005D /* Storage/DataStore.swift */; };
+		CC0000000000000000000003 /* Sampling/MenuBarProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000020 /* Sampling/MenuBarProcess.swift */; };
+		CC0000000000000000000004 /* Sampling/MemoryPressure.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000005F /* Sampling/MemoryPressure.swift */; };
+		CC0000000000000000000005 /* UI/Settings/PreferencesManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000040 /* UI/Settings/PreferencesManager.swift */; };
+		CC0000000000000000000006 /* Sampling/SwapMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000063 /* Sampling/SwapMonitor.swift */; };
+		CC0000000000000000000007 /* Sampling/ProcessMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000021 /* Sampling/ProcessMonitor.swift */; };
+		CC0000000000000000000008 /* Sampling/ProcessSyscall.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000065 /* Sampling/ProcessSyscall.swift */; };
+		CC0000000000000000000009 /* Storage/DataStore+Schema.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000100 /* Storage/DataStore+Schema.swift */; };
+		CC000000000000000000000A /* Storage/DataStore+Samples.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000102 /* Storage/DataStore+Samples.swift */; };
+		CC000000000000000000000B /* Storage/DataStore+Baseline.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000104 /* Storage/DataStore+Baseline.swift */; };
+		CC000000000000000000000C /* Storage/DataStore+AlertEvents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000106 /* Storage/DataStore+AlertEvents.swift */; };
+		CC000000000000000000000D /* Sampling/ProcessMonitor+Enumeration.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000108 /* Sampling/ProcessMonitor+Enumeration.swift */; };
+		CC000000000000000000000E /* Sampling/ProcessMonitor+HelperFolding.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000010A /* Sampling/ProcessMonitor+HelperFolding.swift */; };
+		CC000000000000000000000F /* Sampling/ProcessMonitor+XPCCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000010C /* Sampling/ProcessMonitor+XPCCache.swift */; };
+		DD0000000000000000000001 /* App/IconColorLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0000000000000000000002 /* App/IconColorLogic.swift */; };
+		DD0000000000000000000003 /* App/IconColorLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0000000000000000000002 /* App/IconColorLogic.swift */; };
 		EE000000000000000000001A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000001B /* Assets.xcassets */; };
-		EE000000000000000000003A /* SparkleUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000003B /* SparkleUpdater.swift */; };
-		EE000000000000000000004A /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000004B /* OnboardingView.swift */; };
-		FF000000000000000000001B /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF000000000000000000001A /* HistoryView.swift */; };
-		FF000000000000000000001D /* HistoryWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF000000000000000000001C /* HistoryWindow.swift */; };
-		AA0000000000000000000066 /* ProcessSyscall.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000065 /* ProcessSyscall.swift */; };
-		CC0000000000000000000008 /* ProcessSyscall.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000065 /* ProcessSyscall.swift */; };
-		AA0000000000000000000101 /* DataStore+Schema.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000100 /* DataStore+Schema.swift */; };
-		AA0000000000000000000103 /* DataStore+Samples.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000102 /* DataStore+Samples.swift */; };
-		AA0000000000000000000105 /* DataStore+Baseline.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000104 /* DataStore+Baseline.swift */; };
-		AA0000000000000000000107 /* DataStore+AlertEvents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000106 /* DataStore+AlertEvents.swift */; };
-		AA0000000000000000000109 /* ProcessMonitor+Enumeration.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000108 /* ProcessMonitor+Enumeration.swift */; };
-		AA000000000000000000010B /* ProcessMonitor+HelperFolding.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000010A /* ProcessMonitor+HelperFolding.swift */; };
-		AA000000000000000000010D /* ProcessMonitor+XPCCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000010C /* ProcessMonitor+XPCCache.swift */; };
-		CC0000000000000000000009 /* DataStore+Schema.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000100 /* DataStore+Schema.swift */; };
-		CC000000000000000000000A /* DataStore+Samples.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000102 /* DataStore+Samples.swift */; };
-		CC000000000000000000000B /* DataStore+Baseline.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000104 /* DataStore+Baseline.swift */; };
-		CC000000000000000000000C /* DataStore+AlertEvents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000106 /* DataStore+AlertEvents.swift */; };
-		CC000000000000000000000D /* ProcessMonitor+Enumeration.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000108 /* ProcessMonitor+Enumeration.swift */; };
-		CC000000000000000000000E /* ProcessMonitor+HelperFolding.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000010A /* ProcessMonitor+HelperFolding.swift */; };
-		CC000000000000000000000F /* ProcessMonitor+XPCCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000010C /* ProcessMonitor+XPCCache.swift */; };
+		EE000000000000000000003A /* Updates/SparkleUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000003B /* Updates/SparkleUpdater.swift */; };
+		EE000000000000000000004A /* UI/Onboarding/OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000004B /* UI/Onboarding/OnboardingView.swift */; };
+		FF000000000000000000001B /* UI/History/HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF000000000000000000001A /* UI/History/HistoryView.swift */; };
+		FF000000000000000000001D /* UI/History/HistoryWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF000000000000000000001C /* UI/History/HistoryWindow.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		AA000000000000000000000C /* Menu Bar Diagnostic.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Menu Bar Diagnostic.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		AA000000000000000000000D /* MenuBarDiagnosticApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/MenuBarDiagnosticApp.swift"; sourceTree = "<group>"; };
-		AA000000000000000000000E /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/AppDelegate.swift"; sourceTree = "<group>"; };
-		AA000000000000000000000F /* StatusMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Popover/StatusMenuView.swift"; sourceTree = "<group>"; };
+		AA000000000000000000000D /* App/MenuBarDiagnosticApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/MenuBarDiagnosticApp.swift; sourceTree = "<group>"; };
+		AA000000000000000000000E /* App/AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppDelegate.swift; sourceTree = "<group>"; };
+		AA000000000000000000000F /* UI/Popover/StatusMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/Popover/StatusMenuView.swift; sourceTree = "<group>"; };
 		AA0000000000000000000010 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		AA0000000000000000000020 /* MenuBarProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sampling/MenuBarProcess.swift"; sourceTree = "<group>"; };
-		AA0000000000000000000021 /* ProcessMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sampling/ProcessMonitor.swift"; sourceTree = "<group>"; };
-		AA0000000000000000000030 /* HUDWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/HUD/HUDWindow.swift"; sourceTree = "<group>"; };
-		AA0000000000000000000032 /* HUDView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/HUD/HUDView.swift"; sourceTree = "<group>"; };
-		AA0000000000000000000040 /* PreferencesManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Settings/PreferencesManager.swift"; sourceTree = "<group>"; };
-		AA0000000000000000000042 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Settings/SettingsView.swift"; sourceTree = "<group>"; };
-		AA0000000000000000000051 /* SparklineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Popover/SparklineView.swift"; sourceTree = "<group>"; };
-		AA0000000000000000000053 /* RAMBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/HUD/RAMBarView.swift"; sourceTree = "<group>"; };
-		AA0000000000000000000055 /* ThermalHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/HUD/ThermalHeaderView.swift"; sourceTree = "<group>"; };
-		AA0000000000000000000057 /* ProcessDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/HUD/ProcessDetailSheet.swift"; sourceTree = "<group>"; };
-		AA0000000000000000000059 /* HUDProcessRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/HUD/HUDProcessRow.swift"; sourceTree = "<group>"; };
-		AA000000000000000000005B /* ThermalState+Display.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/HUD/ThermalState+Display.swift"; sourceTree = "<group>"; };
-		AA000000000000000000005D /* DataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Storage/DataStore.swift"; sourceTree = "<group>"; };
-		AA000000000000000000005F /* MemoryPressure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sampling/MemoryPressure.swift"; sourceTree = "<group>"; };
-		AA0000000000000000000061 /* AnomalyDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Detection/AnomalyDetector.swift"; sourceTree = "<group>"; };
-		AA0000000000000000000063 /* SwapMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sampling/SwapMonitor.swift"; sourceTree = "<group>"; };
+		AA0000000000000000000020 /* Sampling/MenuBarProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sampling/MenuBarProcess.swift; sourceTree = "<group>"; };
+		AA0000000000000000000021 /* Sampling/ProcessMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sampling/ProcessMonitor.swift; sourceTree = "<group>"; };
+		AA0000000000000000000030 /* UI/HUD/HUDWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/HUD/HUDWindow.swift; sourceTree = "<group>"; };
+		AA0000000000000000000032 /* UI/HUD/HUDView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/HUD/HUDView.swift; sourceTree = "<group>"; };
+		AA0000000000000000000040 /* UI/Settings/PreferencesManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/Settings/PreferencesManager.swift; sourceTree = "<group>"; };
+		AA0000000000000000000042 /* UI/Settings/SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/Settings/SettingsView.swift; sourceTree = "<group>"; };
+		AA0000000000000000000051 /* UI/Popover/SparklineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/Popover/SparklineView.swift; sourceTree = "<group>"; };
+		AA0000000000000000000053 /* UI/HUD/RAMBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/HUD/RAMBarView.swift; sourceTree = "<group>"; };
+		AA0000000000000000000055 /* UI/HUD/ThermalHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/HUD/ThermalHeaderView.swift; sourceTree = "<group>"; };
+		AA0000000000000000000057 /* UI/HUD/ProcessDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/HUD/ProcessDetailSheet.swift; sourceTree = "<group>"; };
+		AA0000000000000000000059 /* UI/HUD/HUDProcessRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/HUD/HUDProcessRow.swift; sourceTree = "<group>"; };
+		AA000000000000000000005B /* UI/HUD/ThermalState+Display.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/HUD/ThermalState+Display.swift"; sourceTree = "<group>"; };
+		AA000000000000000000005D /* Storage/DataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Storage/DataStore.swift; sourceTree = "<group>"; };
+		AA000000000000000000005F /* Sampling/MemoryPressure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sampling/MemoryPressure.swift; sourceTree = "<group>"; };
+		AA0000000000000000000061 /* Detection/AnomalyDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Detection/AnomalyDetector.swift; sourceTree = "<group>"; };
+		AA0000000000000000000063 /* Sampling/SwapMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sampling/SwapMonitor.swift; sourceTree = "<group>"; };
+		AA0000000000000000000065 /* Sampling/ProcessSyscall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sampling/ProcessSyscall.swift; sourceTree = "<group>"; };
+		AA0000000000000000000100 /* Storage/DataStore+Schema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Storage/DataStore+Schema.swift"; sourceTree = "<group>"; };
+		AA0000000000000000000102 /* Storage/DataStore+Samples.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Storage/DataStore+Samples.swift"; sourceTree = "<group>"; };
+		AA0000000000000000000104 /* Storage/DataStore+Baseline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Storage/DataStore+Baseline.swift"; sourceTree = "<group>"; };
+		AA0000000000000000000106 /* Storage/DataStore+AlertEvents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Storage/DataStore+AlertEvents.swift"; sourceTree = "<group>"; };
+		AA0000000000000000000108 /* Sampling/ProcessMonitor+Enumeration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sampling/ProcessMonitor+Enumeration.swift"; sourceTree = "<group>"; };
+		AA000000000000000000010A /* Sampling/ProcessMonitor+HelperFolding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sampling/ProcessMonitor+HelperFolding.swift"; sourceTree = "<group>"; };
+		AA000000000000000000010C /* Sampling/ProcessMonitor+XPCCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sampling/ProcessMonitor+XPCCache.swift"; sourceTree = "<group>"; };
 		BB0000000000000000000001 /* MenuBarDiagnosticTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MenuBarDiagnosticTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB0000000000000000000009 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
 		BB0000000000000000000101 /* TestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
@@ -110,20 +118,12 @@
 		BB000000000000000000010B /* PreferencesManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesManagerTests.swift; sourceTree = "<group>"; };
 		BB000000000000000000010C /* MemoryPressureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryPressureTests.swift; sourceTree = "<group>"; };
 		BB000000000000000000010D /* MiscTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiscTests.swift; sourceTree = "<group>"; };
-		DD0000000000000000000002 /* IconColorLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/IconColorLogic.swift"; sourceTree = "<group>"; };
+		DD0000000000000000000002 /* App/IconColorLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/IconColorLogic.swift; sourceTree = "<group>"; };
 		EE000000000000000000001B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		EE000000000000000000003B /* SparkleUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Updates/SparkleUpdater.swift"; sourceTree = "<group>"; };
-		EE000000000000000000004B /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Onboarding/OnboardingView.swift"; sourceTree = "<group>"; };
-		FF000000000000000000001A /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/History/HistoryView.swift"; sourceTree = "<group>"; };
-		FF000000000000000000001C /* HistoryWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/History/HistoryWindow.swift"; sourceTree = "<group>"; };
-		AA0000000000000000000065 /* ProcessSyscall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sampling/ProcessSyscall.swift"; sourceTree = "<group>"; };
-		AA0000000000000000000100 /* DataStore+Schema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Storage/DataStore+Schema.swift"; sourceTree = "<group>"; };
-		AA0000000000000000000102 /* DataStore+Samples.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Storage/DataStore+Samples.swift"; sourceTree = "<group>"; };
-		AA0000000000000000000104 /* DataStore+Baseline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Storage/DataStore+Baseline.swift"; sourceTree = "<group>"; };
-		AA0000000000000000000106 /* DataStore+AlertEvents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Storage/DataStore+AlertEvents.swift"; sourceTree = "<group>"; };
-		AA0000000000000000000108 /* ProcessMonitor+Enumeration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sampling/ProcessMonitor+Enumeration.swift"; sourceTree = "<group>"; };
-		AA000000000000000000010A /* ProcessMonitor+HelperFolding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sampling/ProcessMonitor+HelperFolding.swift"; sourceTree = "<group>"; };
-		AA000000000000000000010C /* ProcessMonitor+XPCCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sampling/ProcessMonitor+XPCCache.swift"; sourceTree = "<group>"; };
+		EE000000000000000000003B /* Updates/SparkleUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updates/SparkleUpdater.swift; sourceTree = "<group>"; };
+		EE000000000000000000004B /* UI/Onboarding/OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/Onboarding/OnboardingView.swift; sourceTree = "<group>"; };
+		FF000000000000000000001A /* UI/History/HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/History/HistoryView.swift; sourceTree = "<group>"; };
+		FF000000000000000000001C /* UI/History/HistoryWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/History/HistoryWindow.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -169,39 +169,39 @@
 		AA000000000000000000000B /* MenuBarDiagnostic */ = {
 			isa = PBXGroup;
 			children = (
-				AA000000000000000000000D /* MenuBarDiagnosticApp.swift */,
-				AA000000000000000000000E /* AppDelegate.swift */,
-				AA000000000000000000000F /* StatusMenuView.swift */,
-				AA0000000000000000000020 /* MenuBarProcess.swift */,
-				AA0000000000000000000021 /* ProcessMonitor.swift */,
-				AA0000000000000000000108 /* ProcessMonitor+Enumeration.swift */,
-				AA000000000000000000010A /* ProcessMonitor+HelperFolding.swift */,
-				AA000000000000000000010C /* ProcessMonitor+XPCCache.swift */,
-				AA0000000000000000000065 /* ProcessSyscall.swift */,
-				AA0000000000000000000030 /* HUDWindow.swift */,
-				AA0000000000000000000032 /* HUDView.swift */,
-				AA0000000000000000000040 /* PreferencesManager.swift */,
-				AA0000000000000000000042 /* SettingsView.swift */,
-				AA0000000000000000000051 /* SparklineView.swift */,
-				AA0000000000000000000053 /* RAMBarView.swift */,
-				AA0000000000000000000055 /* ThermalHeaderView.swift */,
-				AA0000000000000000000057 /* ProcessDetailSheet.swift */,
-				AA0000000000000000000059 /* HUDProcessRow.swift */,
-				AA000000000000000000005B /* ThermalState+Display.swift */,
-				AA000000000000000000005D /* DataStore.swift */,
-				AA0000000000000000000100 /* DataStore+Schema.swift */,
-				AA0000000000000000000102 /* DataStore+Samples.swift */,
-				AA0000000000000000000104 /* DataStore+Baseline.swift */,
-				AA0000000000000000000106 /* DataStore+AlertEvents.swift */,
-				AA000000000000000000005F /* MemoryPressure.swift */,
-				AA0000000000000000000061 /* AnomalyDetector.swift */,
-				AA0000000000000000000063 /* SwapMonitor.swift */,
-				DD0000000000000000000002 /* IconColorLogic.swift */,
+				AA000000000000000000000D /* App/MenuBarDiagnosticApp.swift */,
+				AA000000000000000000000E /* App/AppDelegate.swift */,
+				AA000000000000000000000F /* UI/Popover/StatusMenuView.swift */,
+				AA0000000000000000000020 /* Sampling/MenuBarProcess.swift */,
+				AA0000000000000000000021 /* Sampling/ProcessMonitor.swift */,
+				AA0000000000000000000108 /* Sampling/ProcessMonitor+Enumeration.swift */,
+				AA000000000000000000010A /* Sampling/ProcessMonitor+HelperFolding.swift */,
+				AA000000000000000000010C /* Sampling/ProcessMonitor+XPCCache.swift */,
+				AA0000000000000000000065 /* Sampling/ProcessSyscall.swift */,
+				AA0000000000000000000030 /* UI/HUD/HUDWindow.swift */,
+				AA0000000000000000000032 /* UI/HUD/HUDView.swift */,
+				AA0000000000000000000040 /* UI/Settings/PreferencesManager.swift */,
+				AA0000000000000000000042 /* UI/Settings/SettingsView.swift */,
+				AA0000000000000000000051 /* UI/Popover/SparklineView.swift */,
+				AA0000000000000000000053 /* UI/HUD/RAMBarView.swift */,
+				AA0000000000000000000055 /* UI/HUD/ThermalHeaderView.swift */,
+				AA0000000000000000000057 /* UI/HUD/ProcessDetailSheet.swift */,
+				AA0000000000000000000059 /* UI/HUD/HUDProcessRow.swift */,
+				AA000000000000000000005B /* UI/HUD/ThermalState+Display.swift */,
+				AA000000000000000000005D /* Storage/DataStore.swift */,
+				AA0000000000000000000100 /* Storage/DataStore+Schema.swift */,
+				AA0000000000000000000102 /* Storage/DataStore+Samples.swift */,
+				AA0000000000000000000104 /* Storage/DataStore+Baseline.swift */,
+				AA0000000000000000000106 /* Storage/DataStore+AlertEvents.swift */,
+				AA000000000000000000005F /* Sampling/MemoryPressure.swift */,
+				AA0000000000000000000061 /* Detection/AnomalyDetector.swift */,
+				AA0000000000000000000063 /* Sampling/SwapMonitor.swift */,
+				DD0000000000000000000002 /* App/IconColorLogic.swift */,
 				EE000000000000000000001B /* Assets.xcassets */,
-				EE000000000000000000003B /* SparkleUpdater.swift */,
-				EE000000000000000000004B /* OnboardingView.swift */,
-				FF000000000000000000001A /* HistoryView.swift */,
-				FF000000000000000000001C /* HistoryWindow.swift */,
+				EE000000000000000000003B /* Updates/SparkleUpdater.swift */,
+				EE000000000000000000004B /* UI/Onboarding/OnboardingView.swift */,
+				FF000000000000000000001A /* UI/History/HistoryView.swift */,
+				FF000000000000000000001C /* UI/History/HistoryWindow.swift */,
 				AA0000000000000000000010 /* Info.plist */,
 			);
 			path = MenuBarDiagnostic;
@@ -345,38 +345,38 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AA0000000000000000000011 /* MenuBarDiagnosticApp.swift in Sources */,
-				AA0000000000000000000012 /* AppDelegate.swift in Sources */,
-				AA0000000000000000000013 /* StatusMenuView.swift in Sources */,
-				AA0000000000000000000022 /* MenuBarProcess.swift in Sources */,
-				AA0000000000000000000023 /* ProcessMonitor.swift in Sources */,
-				AA0000000000000000000031 /* HUDWindow.swift in Sources */,
-				AA0000000000000000000033 /* HUDView.swift in Sources */,
-				AA0000000000000000000041 /* PreferencesManager.swift in Sources */,
-				AA0000000000000000000043 /* SettingsView.swift in Sources */,
-				AA0000000000000000000052 /* SparklineView.swift in Sources */,
-				AA0000000000000000000054 /* RAMBarView.swift in Sources */,
-				AA0000000000000000000056 /* ThermalHeaderView.swift in Sources */,
-				AA0000000000000000000058 /* ProcessDetailSheet.swift in Sources */,
-				AA000000000000000000005A /* HUDProcessRow.swift in Sources */,
-				AA000000000000000000005C /* ThermalState+Display.swift in Sources */,
-				AA000000000000000000005E /* DataStore.swift in Sources */,
-				AA0000000000000000000060 /* MemoryPressure.swift in Sources */,
-				AA0000000000000000000062 /* AnomalyDetector.swift in Sources */,
-				AA0000000000000000000064 /* SwapMonitor.swift in Sources */,
-				DD0000000000000000000001 /* IconColorLogic.swift in Sources */,
-				EE000000000000000000003A /* SparkleUpdater.swift in Sources */,
-				EE000000000000000000004A /* OnboardingView.swift in Sources */,
-				FF000000000000000000001B /* HistoryView.swift in Sources */,
-				FF000000000000000000001D /* HistoryWindow.swift in Sources */,
-				AA0000000000000000000066 /* ProcessSyscall.swift in Sources */,
-				AA0000000000000000000101 /* DataStore+Schema.swift in Sources */,
-				AA0000000000000000000103 /* DataStore+Samples.swift in Sources */,
-				AA0000000000000000000105 /* DataStore+Baseline.swift in Sources */,
-				AA0000000000000000000107 /* DataStore+AlertEvents.swift in Sources */,
-				AA0000000000000000000109 /* ProcessMonitor+Enumeration.swift in Sources */,
-				AA000000000000000000010B /* ProcessMonitor+HelperFolding.swift in Sources */,
-				AA000000000000000000010D /* ProcessMonitor+XPCCache.swift in Sources */,
+				AA0000000000000000000011 /* App/MenuBarDiagnosticApp.swift in Sources */,
+				AA0000000000000000000012 /* App/AppDelegate.swift in Sources */,
+				AA0000000000000000000013 /* UI/Popover/StatusMenuView.swift in Sources */,
+				AA0000000000000000000022 /* Sampling/MenuBarProcess.swift in Sources */,
+				AA0000000000000000000023 /* Sampling/ProcessMonitor.swift in Sources */,
+				AA0000000000000000000031 /* UI/HUD/HUDWindow.swift in Sources */,
+				AA0000000000000000000033 /* UI/HUD/HUDView.swift in Sources */,
+				AA0000000000000000000041 /* UI/Settings/PreferencesManager.swift in Sources */,
+				AA0000000000000000000043 /* UI/Settings/SettingsView.swift in Sources */,
+				AA0000000000000000000052 /* UI/Popover/SparklineView.swift in Sources */,
+				AA0000000000000000000054 /* UI/HUD/RAMBarView.swift in Sources */,
+				AA0000000000000000000056 /* UI/HUD/ThermalHeaderView.swift in Sources */,
+				AA0000000000000000000058 /* UI/HUD/ProcessDetailSheet.swift in Sources */,
+				AA000000000000000000005A /* UI/HUD/HUDProcessRow.swift in Sources */,
+				AA000000000000000000005C /* UI/HUD/ThermalState+Display.swift in Sources */,
+				AA000000000000000000005E /* Storage/DataStore.swift in Sources */,
+				AA0000000000000000000060 /* Sampling/MemoryPressure.swift in Sources */,
+				AA0000000000000000000062 /* Detection/AnomalyDetector.swift in Sources */,
+				AA0000000000000000000064 /* Sampling/SwapMonitor.swift in Sources */,
+				DD0000000000000000000001 /* App/IconColorLogic.swift in Sources */,
+				EE000000000000000000003A /* Updates/SparkleUpdater.swift in Sources */,
+				EE000000000000000000004A /* UI/Onboarding/OnboardingView.swift in Sources */,
+				FF000000000000000000001B /* UI/History/HistoryView.swift in Sources */,
+				FF000000000000000000001D /* UI/History/HistoryWindow.swift in Sources */,
+				AA0000000000000000000066 /* Sampling/ProcessSyscall.swift in Sources */,
+				AA0000000000000000000101 /* Storage/DataStore+Schema.swift in Sources */,
+				AA0000000000000000000103 /* Storage/DataStore+Samples.swift in Sources */,
+				AA0000000000000000000105 /* Storage/DataStore+Baseline.swift in Sources */,
+				AA0000000000000000000107 /* Storage/DataStore+AlertEvents.swift in Sources */,
+				AA0000000000000000000109 /* Sampling/ProcessMonitor+Enumeration.swift in Sources */,
+				AA000000000000000000010B /* Sampling/ProcessMonitor+HelperFolding.swift in Sources */,
+				AA000000000000000000010D /* Sampling/ProcessMonitor+XPCCache.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -397,22 +397,22 @@
 				BB000000000000000000011B /* PreferencesManagerTests.swift in Sources */,
 				BB000000000000000000011C /* MemoryPressureTests.swift in Sources */,
 				BB000000000000000000011D /* MiscTests.swift in Sources */,
-				CC0000000000000000000001 /* AnomalyDetector.swift in Sources */,
-				CC0000000000000000000002 /* DataStore.swift in Sources */,
-				CC0000000000000000000003 /* MenuBarProcess.swift in Sources */,
-				CC0000000000000000000004 /* MemoryPressure.swift in Sources */,
-				CC0000000000000000000005 /* PreferencesManager.swift in Sources */,
-				CC0000000000000000000006 /* SwapMonitor.swift in Sources */,
-				CC0000000000000000000007 /* ProcessMonitor.swift in Sources */,
-				CC0000000000000000000008 /* ProcessSyscall.swift in Sources */,
-				CC0000000000000000000009 /* DataStore+Schema.swift in Sources */,
-				CC000000000000000000000A /* DataStore+Samples.swift in Sources */,
-				CC000000000000000000000B /* DataStore+Baseline.swift in Sources */,
-				CC000000000000000000000C /* DataStore+AlertEvents.swift in Sources */,
-				CC000000000000000000000D /* ProcessMonitor+Enumeration.swift in Sources */,
-				CC000000000000000000000E /* ProcessMonitor+HelperFolding.swift in Sources */,
-				CC000000000000000000000F /* ProcessMonitor+XPCCache.swift in Sources */,
-				DD0000000000000000000003 /* IconColorLogic.swift in Sources */,
+				CC0000000000000000000001 /* Detection/AnomalyDetector.swift in Sources */,
+				CC0000000000000000000002 /* Storage/DataStore.swift in Sources */,
+				CC0000000000000000000003 /* Sampling/MenuBarProcess.swift in Sources */,
+				CC0000000000000000000004 /* Sampling/MemoryPressure.swift in Sources */,
+				CC0000000000000000000005 /* UI/Settings/PreferencesManager.swift in Sources */,
+				CC0000000000000000000006 /* Sampling/SwapMonitor.swift in Sources */,
+				CC0000000000000000000007 /* Sampling/ProcessMonitor.swift in Sources */,
+				CC0000000000000000000008 /* Sampling/ProcessSyscall.swift in Sources */,
+				CC0000000000000000000009 /* Storage/DataStore+Schema.swift in Sources */,
+				CC000000000000000000000A /* Storage/DataStore+Samples.swift in Sources */,
+				CC000000000000000000000B /* Storage/DataStore+Baseline.swift in Sources */,
+				CC000000000000000000000C /* Storage/DataStore+AlertEvents.swift in Sources */,
+				CC000000000000000000000D /* Sampling/ProcessMonitor+Enumeration.swift in Sources */,
+				CC000000000000000000000E /* Sampling/ProcessMonitor+HelperFolding.swift in Sources */,
+				CC000000000000000000000F /* Sampling/ProcessMonitor+XPCCache.swift in Sources */,
+				DD0000000000000000000003 /* App/IconColorLogic.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -573,7 +573,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 2G2H3TQ8J8;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
 				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
