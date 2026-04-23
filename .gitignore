@@ -25,3 +25,6 @@ build/
 Package.resolved
 
 .autonomous/
+
+# autonomous-skill per-sprint worktrees
+.worktrees/
