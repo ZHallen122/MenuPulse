@@ -148,7 +148,7 @@ jobs:
           tar -xf /tmp/sparkle/Sparkle.tar.xz -C /tmp/sparkle/
           
           # Generate the EdDSA signature for the update zip using the private key
-          SIGNATURE=$(/tmp/sparkle/bin/sign_update -s "$SPARKLE_EDDSA_KEY" "build/$APP_NAME.zip")
+          SIGNATURE=$(echo "$SPARKLE_EDDSA_KEY" | /tmp/sparkle/bin/sign_update --ed-key-file - "build/$APP_NAME.zip")
           echo "SPARKLE_SIGNATURE=$SIGNATURE" >> $GITHUB_ENV
           
           # Output signature into a text file for easy download from Actions page
