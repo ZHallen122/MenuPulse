@@ -5,7 +5,6 @@ A native macOS menu bar app that watches other menu bar apps for memory anomalie
 <img width="328" height="452" alt="image" src="https://github.com/user-attachments/assets/68212162-10c2-4301-a77a-25af2b9bdc08" />
 
 
-<img width="573" height="455" alt="image" src="https://github.com/user-attachments/assets/eb7e5f4a-3449-41cd-9f0a-c8110666567a" />
 
 
 
