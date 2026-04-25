@@ -16,21 +16,21 @@ Command-line build:
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-xcodebuild -project "Menu Bar Diagnostic.xcodeproj" \
-           -scheme "Menu Bar Diagnostic" \
+xcodebuild -project "Bouncer.xcodeproj" \
+           -scheme "Bouncer" \
            -configuration Debug build
 ```
 
-Or open in Xcode, select the **Menu Bar Diagnostic** scheme, and press **⌘R**.
+Or open in Xcode, select the **Bouncer** scheme, and press **⌘R**.
 
 ## Run tests
 
-The `"Menu Bar Diagnostic"` scheme is not configured for testing. Use the dedicated test scheme:
+The `"Bouncer"` scheme is not configured for testing. Use the dedicated test scheme:
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-xcodebuild -project "Menu Bar Diagnostic.xcodeproj" \
-           -scheme "MenuBarDiagnosticTests" \
+xcodebuild -project "Bouncer.xcodeproj" \
+           -scheme "BouncerTests" \
            -configuration Debug test
 ```
 

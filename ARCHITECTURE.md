@@ -1,10 +1,10 @@
 # Architecture
 
-Bouncer's source tree is organized into layered folders under `MenuBarDiagnostic/`. Each folder has a single responsibility; cross-layer wiring happens in `App/AppDelegate.swift`. When adding a new file, pick the folder whose description matches — if nothing fits, the layering is probably wrong, not the folder list.
+Bouncer's source tree is organized into layered folders under `Bouncer/`. Each folder has a single responsibility; cross-layer wiring happens in `App/AppDelegate.swift`. When adding a new file, pick the folder whose description matches — if nothing fits, the layering is probably wrong, not the folder list.
 
 ## App/
 
-Entry point and top-level lifecycle wiring. Contains `MenuBarDiagnosticApp` (the SwiftUI `@main`), `AppDelegate` (owns `NSStatusItem`, `NSPopover`, and the notification handlers), and `IconColorLogic` (pure mapping from swap/anomaly state → status-bar tint). Does NOT contain sampling, detection, persistence, or reusable views.
+Entry point and top-level lifecycle wiring. Contains `BouncerApp` (the SwiftUI `@main`), `AppDelegate` (owns `NSStatusItem`, `NSPopover`, and the notification handlers), and `IconColorLogic` (pure mapping from swap/anomaly state → status-bar tint). Does NOT contain sampling, detection, persistence, or reusable views.
 
 ## Sampling/
 

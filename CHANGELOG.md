@@ -38,7 +38,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Architecture
 
-- Entry point: `MenuBarDiagnosticApp.swift` (SwiftUI `@main` App) wiring `AppDelegate`
+- Entry point: `BouncerApp.swift` (SwiftUI `@main` App) wiring `AppDelegate`
 - `AppDelegate` owns `NSStatusItem` and `NSPopover`
 - Sampling layer: `ProcessMonitor.swift`, `MemoryPressure.swift`
 - Detection layer: `AnomalyDetector.swift`

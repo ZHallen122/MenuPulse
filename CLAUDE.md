@@ -1,4 +1,4 @@
-# CLAUDE.md — Menu Bar Diagnostic (Bouncer)
+# CLAUDE.md — Bouncer
 
 Quick-start reference for contributors and automated agents.
 
@@ -15,32 +15,32 @@ Active developer directory must point to Xcode.app (not the CLI tools shim):
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-xcodebuild -project "Menu Bar Diagnostic.xcodeproj" \
-           -scheme "Menu Bar Diagnostic" \
+xcodebuild -project "Bouncer.xcodeproj" \
+           -scheme "Bouncer" \
            -configuration Debug build
 ```
 
 ## Run tests
 
-The `"Menu Bar Diagnostic"` scheme is **not** configured for testing. Use the dedicated test scheme:
+The `"Bouncer"` scheme is **not** configured for testing. Use the dedicated test scheme:
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-xcodebuild -project "Menu Bar Diagnostic.xcodeproj" \
-           -scheme "MenuBarDiagnosticTests" \
+xcodebuild -project "Bouncer.xcodeproj" \
+           -scheme "BouncerTests" \
            -configuration Debug test
 ```
 
 ## Entry point
 
-`App/MenuBarDiagnosticApp.swift` — SwiftUI `@main` `App` struct.  
+`App/BouncerApp.swift` — SwiftUI `@main` `App` struct.  
 It wires `AppDelegate` (`App/AppDelegate.swift`) via `@NSApplicationDelegateAdaptor`; `AppDelegate` owns the `NSStatusItem` and `NSPopover`.
 
 ## Key layers
 
 | Layer | Files |
 |---|---|
-| Entry / lifecycle | `App/MenuBarDiagnosticApp.swift`, `App/AppDelegate.swift` |
+| Entry / lifecycle | `App/BouncerApp.swift`, `App/AppDelegate.swift` |
 | Sampling | `Sampling/ProcessMonitor.swift`, `Sampling/ProcessMonitor+Enumeration.swift`, `Sampling/ProcessMonitor+HelperFolding.swift`, `Sampling/ProcessMonitor+XPCCache.swift`, `Sampling/MemoryPressure.swift`, `Sampling/SwapMonitor.swift`, `Sampling/MenuBarProcess.swift`, `Sampling/ProcessSyscall.swift` |
 | Detection | `Detection/AnomalyDetector.swift` |
 | Icon coloring | `App/IconColorLogic.swift` |

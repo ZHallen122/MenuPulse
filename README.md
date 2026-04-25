@@ -46,7 +46,7 @@ The icon color reflects current system state at a glance:
 ## Architecture
 
 ```
-MenuBarDiagnosticApp (@main, SwiftUI App)
+BouncerApp (@main, SwiftUI App)
 └── AppDelegate (via @NSApplicationDelegateAdaptor)
     ├── NSStatusItem (stethoscope icon, green/orange/red tint)
     └── NSPopover → StatusMenuView (SwiftUI)
@@ -73,7 +73,7 @@ ProcessMonitor  ──samples every 2s──►  AnomalyDetector
 
 | File | Role |
 |---|---|
-| `App/MenuBarDiagnosticApp.swift` | SwiftUI `@main` entry point; wires `AppDelegate` via `@NSApplicationDelegateAdaptor` |
+| `App/BouncerApp.swift` | SwiftUI `@main` entry point; wires `AppDelegate` via `@NSApplicationDelegateAdaptor` |
 | `App/AppDelegate.swift` | Owns `NSStatusItem`, `NSPopover`, notification handling |
 | `App/IconColorLogic.swift` | Pure `iconColor()` function; maps `SwapState` + `pendingAnomalyAlert` → `NSColor` for the status bar icon |
 | `Sampling/ProcessMonitor.swift` | Sampling engine; publishes `[MenuBarProcess]` and system memory pressure |
@@ -121,10 +121,10 @@ ProcessMonitor  ──samples every 2s──►  AnomalyDetector
    ```bash
    git clone https://github.com/ZHallen122/MenuPulse
    cd MenuPulse
-   open "Menu Bar Diagnostic.xcodeproj"
+   open "Bouncer.xcodeproj"
    ```
 
-2. Select the **Menu Bar Diagnostic** scheme and your Mac as the run destination.
+2. Select the **Bouncer** scheme and your Mac as the run destination.
 
 3. Press **⌘R** to build and run.
 
@@ -134,8 +134,8 @@ ProcessMonitor  ──samples every 2s──►  AnomalyDetector
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-xcodebuild -project "Menu Bar Diagnostic.xcodeproj" \
-           -scheme "Menu Bar Diagnostic" \
+xcodebuild -project "Bouncer.xcodeproj" \
+           -scheme "Bouncer" \
            -configuration Debug build
 ```
 
@@ -145,8 +145,8 @@ The main scheme is not configured for testing. Use the dedicated test scheme:
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-xcodebuild -project "Menu Bar Diagnostic.xcodeproj" \
-           -scheme "MenuBarDiagnosticTests" \
+xcodebuild -project "Bouncer.xcodeproj" \
+           -scheme "BouncerTests" \
            -configuration Debug test
 ```
 
