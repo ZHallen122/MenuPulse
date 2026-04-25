@@ -4,23 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [1.0.2] - 2026-04-12
+## [1.0] - 2026-04-25 — Bouncer launch
 
-### Added
+### Changed
 
+- **Renamed to Bouncer** — the project, build product, Xcode targets, schemes, source folders, `@main` struct, and bundle identifiers were renamed from "Menu Bar Diagnostic" / `com.allenz.MenuBarDiagnostic` to "Bouncer" / `com.allenz.Bouncer`. **Existing installs will not auto-update via Sparkle because the bundle ID changed — please reinstall from the v1.0 release.**
 - **Block List settings tab** — dedicated UI in Settings for managing ignored bundle IDs; replaces the old comma-separated text field with a proper list view with `+` / `-` controls
-
-### Changed
-
 - **App count in status menu** — the "N apps running" summary now reflects the filtered list (block-listed apps excluded from count)
+- **Process list display** — anomalous and normal processes render in a single unified list, with anomalous entries always sorted to the top followed by remaining processes ordered by memory usage
 
-## [1.0.1] - 2026-04-12
-
-### Changed
-
-- **Process list display** — anomalous and normal processes now render in a single unified list, with anomalous entries always sorted to the top followed by remaining processes ordered by memory usage
-
-## [1.0] - 2026-04-10
+## [Pre-rebrand history] — Menu Bar Diagnostic 1.0–1.0.2 (2026-04-10 to 2026-04-12)
 
 ### Added
 
