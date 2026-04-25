@@ -1,6 +1,6 @@
 import XCTest
 
-final class DataStoreBaselineTests: MenuBarDiagnosticTestCase {
+final class DataStoreBaselineTests: BouncerTestCase {
 
     func testP90BaselineComputation() {
         let store = DataStore(path: ":memory:")

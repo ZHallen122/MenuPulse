@@ -1,6 +1,6 @@
 import XCTest
 
-final class DataStoreSchemaTests: MenuBarDiagnosticTestCase {
+final class DataStoreSchemaTests: BouncerTestCase {
 
     func testPurgeDoesNotRemoveFreshSamples() {
         let store = DataStore(path: ":memory:")

@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "BB0000000000000000000002"
-               BuildableName = "MenuBarDiagnosticTests.xctest"
-               BlueprintName = "MenuBarDiagnosticTests"
-               ReferencedContainer = "container:Menu Bar Diagnostic.xcodeproj">
+               BuildableName = "BouncerTests.xctest"
+               BlueprintName = "BouncerTests"
+               ReferencedContainer = "container:Bouncer.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "BB0000000000000000000002"
-               BuildableName = "MenuBarDiagnosticTests.xctest"
-               BlueprintName = "MenuBarDiagnosticTests"
-               ReferencedContainer = "container:Menu Bar Diagnostic.xcodeproj">
+               BuildableName = "BouncerTests.xctest"
+               BlueprintName = "BouncerTests"
+               ReferencedContainer = "container:Bouncer.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>

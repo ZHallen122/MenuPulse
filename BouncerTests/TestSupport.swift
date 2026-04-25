@@ -1,7 +1,7 @@
 import XCTest
 import AppKit
 
-class MenuBarDiagnosticTestCase: XCTestCase {
+class BouncerTestCase: XCTestCase {
 
     override func setUp() {
         super.setUp()

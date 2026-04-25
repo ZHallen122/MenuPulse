@@ -1,6 +1,6 @@
 import XCTest
 
-final class SwapMonitorTests: MenuBarDiagnosticTestCase {
+final class SwapMonitorTests: BouncerTestCase {
 
     private let MB: UInt64 = 1_048_576
     private let GB: UInt64 = 1_073_741_824

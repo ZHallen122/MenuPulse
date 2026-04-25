@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct MenuBarDiagnosticApp: App {
+struct BouncerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {

@@ -1,7 +1,7 @@
 import XCTest
 import AppKit
 
-final class IconColorLogicTests: MenuBarDiagnosticTestCase {
+final class IconColorLogicTests: BouncerTestCase {
 
     // (1) Anomaly alert sets orange icon state
     func testIconColorOrangeWhenPendingAnomalyAlert() {

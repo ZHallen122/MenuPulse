@@ -262,7 +262,7 @@ final class DataStore {
     private func openDatabase() {
         let fm = FileManager.default
         guard let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return }
-        let dir = appSupport.appendingPathComponent("MenuBarDiagnostic", isDirectory: true)
+        let dir = appSupport.appendingPathComponent("Bouncer", isDirectory: true)
         do {
             try fm.createDirectory(at: dir, withIntermediateDirectories: true)
         } catch {
