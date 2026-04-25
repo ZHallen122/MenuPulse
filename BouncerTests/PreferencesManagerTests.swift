@@ -1,6 +1,6 @@
 import XCTest
 
-final class PreferencesManagerTests: MenuBarDiagnosticTestCase {
+final class PreferencesManagerTests: BouncerTestCase {
 
     func testIgnoredBundleIDsParsingTrimsWhitespace() {
         let prefs = PreferencesManager()

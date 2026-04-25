@@ -1,6 +1,6 @@
 import XCTest
 
-final class AnomalyDetectorTests: MenuBarDiagnosticTestCase {
+final class AnomalyDetectorTests: BouncerTestCase {
 
     func testSlopePositiveForIncreasingMemory() {
         let now = Date()

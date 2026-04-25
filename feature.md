@@ -8,7 +8,7 @@ Complete description of every feature in the app. Intended as a living document;
 
 Bouncer runs as a native macOS menu bar agent — no Dock icon, no main window. It appears only as a stethoscope-themed icon in the system menu bar. The icon is always visible while the app is running and serves as the primary status indicator and entry point for all UI.
 
-**Files:** `MenuBarDiagnosticApp.swift`, `AppDelegate.swift`
+**Files:** `BouncerApp.swift`, `AppDelegate.swift`
 
 ---
 

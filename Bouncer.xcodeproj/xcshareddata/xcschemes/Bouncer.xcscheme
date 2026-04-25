@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "AA0000000000000000000002"
-               BuildableName = "Menu Bar Diagnostic.app"
-               BlueprintName = "Menu Bar Diagnostic"
-               ReferencedContainer = "container:Menu Bar Diagnostic.xcodeproj">
+               BuildableName = "Bouncer.app"
+               BlueprintName = "Bouncer"
+               ReferencedContainer = "container:Bouncer.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -46,9 +46,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "AA0000000000000000000002"
-            BuildableName = "Menu Bar Diagnostic.app"
-            BlueprintName = "Menu Bar Diagnostic"
-            ReferencedContainer = "container:Menu Bar Diagnostic.xcodeproj">
+            BuildableName = "Bouncer.app"
+            BlueprintName = "Bouncer"
+            ReferencedContainer = "container:Bouncer.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -63,9 +63,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "AA0000000000000000000002"
-            BuildableName = "Menu Bar Diagnostic.app"
-            BlueprintName = "Menu Bar Diagnostic"
-            ReferencedContainer = "container:Menu Bar Diagnostic.xcodeproj">
+            BuildableName = "Bouncer.app"
+            BlueprintName = "Bouncer"
+            ReferencedContainer = "container:Bouncer.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

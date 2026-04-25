@@ -1,6 +1,6 @@
 import XCTest
 
-final class DataStoreAlertEventsTests: MenuBarDiagnosticTestCase {
+final class DataStoreAlertEventsTests: BouncerTestCase {
 
     func testInsertAlertEventReturnsValidRowID() {
         let store = DataStore(path: ":memory:")

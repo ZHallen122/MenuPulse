@@ -1,6 +1,6 @@
 import XCTest
 
-final class ProcessMonitorEnumerationTests: MenuBarDiagnosticTestCase {
+final class ProcessMonitorEnumerationTests: BouncerTestCase {
 
     func testPersistAndAdvanceLifecycleThrottleGuard() {
         // First call (lastPersistTime = distantPast) writes an app lifecycle entry.

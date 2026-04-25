@@ -1,6 +1,6 @@
 import XCTest
 
-final class MiscTests: MenuBarDiagnosticTestCase {
+final class MiscTests: BouncerTestCase {
 
     func testHasShownOnboardingGate() {
         UserDefaults.standard.removeObject(forKey: "hasShownOnboarding")
@@ -22,7 +22,7 @@ final class MiscTests: MenuBarDiagnosticTestCase {
         let testFileURL = URL(fileURLWithPath: #file)
         let projectRoot = testFileURL.deletingLastPathComponent().deletingLastPathComponent()
         let contentsJsonURL = projectRoot
-            .appendingPathComponent("MenuBarDiagnostic")
+            .appendingPathComponent("Bouncer")
             .appendingPathComponent("Assets.xcassets")
             .appendingPathComponent("AppIcon.appiconset")
             .appendingPathComponent("Contents.json")
