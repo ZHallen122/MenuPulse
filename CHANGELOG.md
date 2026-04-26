@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.0.1] - 2026-04-25
+
+### Added
+
+- Added a security policy for responsible vulnerability reporting.
+
+### Changed
+
+- Refreshed the app icon assets for a clearer Bouncer identity.
+- Updated README wording to better match the shipped behavior and open-source release expectations.
+
+### Fixed
+
+- Fixed the popover so the process list is populated on first open.
+- Forced dark appearance for popover/HUD host windows so tinted controls render consistently.
+
 ## [1.0] - 2026-04-25 — Bouncer launch
 
 ### Changed
