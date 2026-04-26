@@ -25,6 +25,8 @@
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
     <key>SUFeedURL</key>
-    <string>https://example.com/bouncer-appcast.xml</string>
+    <string>https://zhallen122.github.io/Bouncer/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>X6SilXbZlKnhHfojYA1OGgoY0pGxv+pmj4PuP/h+AA0=</string>
 </dict>
 </plist>

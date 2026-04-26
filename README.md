@@ -162,7 +162,7 @@ xcodebuild -project "Bouncer.xcodeproj" \
 | Sensitivity | Conservative / Default / Aggressive — adjusts the p90 multiplier threshold |
 | Launch at login | Registers/unregisters via `SMAppService` |
 | Show RAM Usage in Menu Bar | Shows current RAM usage percentage next to the menu bar icon |
-| Automatic updates | Preference shown in Settings; Sparkle support is present, but release builds still need a real appcast/signing setup |
+| Automatic updates | Preference shown in Settings; Sparkle uses the published appcast when release builds are distributed |
 
 ## Privacy
 
@@ -170,8 +170,9 @@ Bouncer runs locally. It samples process names, bundle identifiers, CPU, memory 
 
 ## Release notes for maintainers
 
-- `Bouncer/Info.plist` currently contains a placeholder Sparkle `SUFeedURL`; replace it with a real appcast before shipping binaries.
-- The GitHub release workflow expects Apple Developer ID and Sparkle signing secrets.
+- `Bouncer/Info.plist` contains the Sparkle `SUFeedURL` and public EdDSA key used by release builds.
+- The GitHub release workflow expects Apple Developer ID secrets and `SPARKLE_EDDSA_KEY`, then generates `appcast.xml` from the release archive.
+- Enable GitHub Pages for the `main` branch root so `https://zhallen122.github.io/Bouncer/appcast.xml` is publicly reachable.
 - Commit `Bouncer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` so Sparkle remains pinned for contributors and CI.
 
 ---

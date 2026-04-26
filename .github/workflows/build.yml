@@ -6,6 +6,9 @@ on:
       - 'v*' # Trigger only on version tags (e.g., v1.0.0)
   workflow_dispatch: # Allow manual trigger on GitHub Actions page for testing
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build, Sign and Notarize
@@ -138,7 +141,7 @@ jobs:
             
           xcrun stapler staple "build/$APP_NAME.dmg"
 
-      - name: Generate Sparkle EdDSA Signature
+      - name: Generate Sparkle Appcast
         env:
           SPARKLE_EDDSA_KEY: ${{ secrets.SPARKLE_EDDSA_KEY }}
         run: |
@@ -146,15 +149,15 @@ jobs:
           # Download the Sparkle tools matching the SPM project version (resolved as 2.9.1)
           curl -L -o /tmp/sparkle/Sparkle.tar.xz "https://github.com/sparkle-project/Sparkle/releases/download/2.9.1/Sparkle-2.9.1.tar.xz"
           tar -xf /tmp/sparkle/Sparkle.tar.xz -C /tmp/sparkle/
-          
-          # Generate the EdDSA signature for the update zip using the private key
-          SIGNATURE=$(echo "$SPARKLE_EDDSA_KEY" | /tmp/sparkle/bin/sign_update --ed-key-file - "build/$APP_NAME.zip")
-          echo "SPARKLE_SIGNATURE=$SIGNATURE" >> $GITHUB_ENV
-          
-          # Output signature into a text file for easy download from Actions page
-          echo "$SIGNATURE" > build/sparkle_signature.txt
-          
-          # You can add a script here to auto-update appcast.xml, or manually enter the signature
+
+          mkdir -p build/appcast
+          cp "build/$APP_NAME.zip" "build/appcast/$APP_NAME.zip"
+          echo "$SPARKLE_EDDSA_KEY" | /tmp/sparkle/bin/generate_appcast \
+            --ed-key-file - \
+            --download-url-prefix "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/" \
+            --link "https://github.com/${{ github.repository }}" \
+            build/appcast
+          cp build/appcast/appcast.xml build/appcast.xml
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -163,11 +166,25 @@ jobs:
           files: |
             build/*.dmg
             build/*.zip
-            build/sparkle_signature.txt
+            build/appcast.xml
           body: |
             ## Release Overview
-            This is the latest automated build. Remember to update your \`appcast.xml\` with the following details.
-            
-            **Sparkle EdDSA Signature**: \`${{ env.SPARKLE_SIGNATURE }}\`
-          draft: true
+            This automated build is notarized and includes a Sparkle appcast generated from the release archive.
+          draft: false
           generate_release_notes: true
+
+      - name: Publish Sparkle Appcast
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          appcast_repo="$(mktemp -d)"
+          git -C "$appcast_repo" init
+          git -C "$appcast_repo" remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          git -C "$appcast_repo" fetch --depth=1 origin main
+          git -C "$appcast_repo" checkout -B main FETCH_HEAD
+
+          cp build/appcast.xml "$appcast_repo/appcast.xml"
+          git -C "$appcast_repo" config user.name "github-actions[bot]"
+          git -C "$appcast_repo" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$appcast_repo" add appcast.xml
+          git -C "$appcast_repo" commit -m "Update appcast for ${{ github.ref_name }}" || exit 0
+          git -C "$appcast_repo" push origin main
